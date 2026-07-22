@@ -4,7 +4,7 @@ Spring Boot + React 기반 위치 중심 의료기관 탐색 서비스입니다.
 
 ## First Milestone
 
-- 국립중앙의료원 공공데이터에서 현재 위치 주변의 실제 병원과 약국 조회
+- 국립중앙의료원 FullData를 로컬 DB에 증분 동기화한 뒤 현재 위치 주변 병·의원 조회
 - 거리순, 이름순, 운영 종료 임박순 정렬
 - 데이터 갱신 시각 표시
 - 의료기관 선택 시 해당 위치로 지도 이동
@@ -56,7 +56,7 @@ DB_USERNAME=root
 DB_PASSWORD=password
 ```
 
-실제 의료기관 조회는 국립중앙의료원 공공데이터 API를 기준으로 사용합니다. 병원은 위치 API 결과에 더해 지역별 목록 API의 좌표를 직접 주변 목록으로 구성하고, 주소·전화번호·기관 종류·요일별 운영시간을 함께 적용합니다. 공공데이터 조회 결과가 없거나 실패한 종류에만 OpenStreetMap Overpass API를 대체 좌표/목록으로 사용합니다. PowerShell에서 인증키를 환경 변수로 지정한 뒤, 같은 창에서 백엔드를 시작해야 합니다. 외부 조회 결과는 2분 동안 캐시됩니다.
+국립중앙의료원 병·의원 FullData는 기본적으로 매일 오전 3시에 동기화됩니다. HPID를 고유키로 `INSERT ... ON DUPLICATE KEY UPDATE`를 수행하고, 전체 동기화와 진료과목 동기화가 모두 성공한 경우에만 이번 실행에서 수신되지 않은 병·의원을 비활성화합니다. 검색 요청은 외부 API를 호출하지 않고 MySQL에 저장된 활성 기관과 진료과목, 운영시간만 조회합니다. 당일 성공 이력이 없으면 애플리케이션 시작 후 백그라운드에서 한 번 동기화합니다.
 
 ```powershell
 $env:DATA_GO_KR_SERVICE_KEY='공공데이터포털 일반 인증키'
@@ -67,14 +67,12 @@ cd backend
 ```text
 PUBLIC_DATA_ENABLED=true
 DATA_GO_KR_SERVICE_KEY=공공데이터포털 일반 인증키
-DATA_GO_KR_HOSPITAL_LOCATION_ENABLED=true
-DATA_GO_KR_EMERGENCY_MEDICAL_ENABLED=true
-DATA_GO_KR_EMERGENCY_AVAILABILITY_CACHE_TTL=1m
-DATA_GO_KR_TIMEOUT=10s
-DATA_GO_KR_CACHE_TTL=2m
-DATA_GO_KR_OPERATING_HOURS_CACHE_TTL=1h
-DATA_GO_KR_MAX_OPERATING_HOURS_ROWS=5000
-DATA_GO_KR_MAX_RESULTS=1000
+DATA_GO_KR_HOSPITAL_FULL_DATA_URL=https://apis.data.go.kr/B552657/HsptlAsembySearchService/getHsptlMdcncFullDown
+DATA_GO_KR_HOSPITAL_DEPARTMENT_LIST_URL=https://apis.data.go.kr/B552657/HsptlAsembySearchService/getHsptlMdcncListInfoInqire
+DATA_GO_KR_TIMEOUT=20s
+DATA_GO_KR_SYNC_PAGE_SIZE=1000
+DATA_GO_KR_SYNC_ON_STARTUP=true
+DATA_GO_KR_SYNC_CRON=0 0 3 * * *
 ```
 
 회원가입 주소를 검색 좌표로 변환하려면 NAVER Cloud Platform Maps 애플리케이션에서 Geocoding API를 활성화하고 서버 환경 변수에 인증키를 지정합니다. 비밀번호는 BCrypt로 저장되며 로그인 상태는 Spring Security HTTP 세션으로 유지됩니다.
@@ -83,16 +81,6 @@ DATA_GO_KR_MAX_RESULTS=1000
 NAVER_MAPS_API_KEY_ID=Maps API Key ID
 NAVER_MAPS_API_KEY=Maps API Key
 NAVER_MAPS_TIMEOUT=10s
-```
-
-OpenStreetMap 대체 조회 설정은 다음과 같습니다.
-
-```text
-OSM_OVERPASS_ENABLED=true
-OSM_OVERPASS_URL=https://overpass.private.coffee/api/interpreter
-OSM_OVERPASS_FALLBACK_URL_1=https://overpass-api.de/api/interpreter
-OSM_OVERPASS_FALLBACK_URL_2=https://maps.mail.ru/osm/tools/overpass/api/interpreter
-OSM_OVERPASS_TIMEOUT=15s
 ```
 
 ## Frontend Run

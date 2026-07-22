@@ -3,7 +3,6 @@ package com.example.medicalsearch.repository;
 import com.example.medicalsearch.entity.MedicalInstitution;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -16,8 +15,16 @@ public interface MedicalInstitutionRepository extends JpaRepository<MedicalInsti
     @Query(value = """
             SELECT
                 mi.id AS id,
-                mi.type AS type,
+                CASE
+                    WHEN mi.type = 'HOSPITAL'
+                         AND :includeHospitals = FALSE
+                         AND :includeEmergencyRooms = TRUE
+                    THEN 'EMERGENCY_ROOM'
+                    ELSE mi.type
+                END AS type,
                 mi.name AS name,
+                mi.institution_kind_name AS institutionKind,
+                mi.department_codes AS medicalDepartmentCodes,
                 mi.phone_number AS phoneNumber,
                 mi.road_address AS roadAddress,
                 mi.latitude AS latitude,
@@ -25,54 +32,149 @@ public interface MedicalInstitutionRepository extends JpaRepository<MedicalInsti
                 ST_Distance_Sphere(POINT(mi.longitude, mi.latitude), POINT(:lng, :lat)) AS distanceMeters,
                 oh.open_time AS todayOpenTime,
                 oh.close_time AS todayCloseTime,
+                mi.night_service AS nightService,
+                mi.twenty_four_hours AS twentyFourHours,
+                mi.saturday_service AS saturdayService,
+                mi.sunday_service AS sundayService,
+                mi.holiday_service AS holidayService,
                 mi.last_synced_at AS lastSyncedAt
             FROM medical_institutions mi
-            JOIN operating_hours oh ON oh.institution_id = mi.id
-            WHERE mi.active = true
-              AND mi.type IN (:types)
-              AND oh.day_of_week = :dayOfWeek
-              AND oh.closed = false
+            LEFT JOIN operating_hours oh
+              ON oh.institution_id = mi.id
+             AND oh.day_of_week = :dayOfWeek
+            WHERE mi.active = TRUE
               AND (
-                    (oh.open_time <= oh.close_time AND :currentTime >= oh.open_time AND :currentTime < oh.close_time)
-                    OR
-                    (oh.open_time > oh.close_time AND (:currentTime >= oh.open_time OR :currentTime < oh.close_time))
+                    (:includeHospitals = TRUE AND mi.type = 'HOSPITAL')
+                    OR (:includePharmacies = TRUE AND mi.type = 'PHARMACY')
+                    OR (:includeEmergencyRooms = TRUE AND mi.emergency_room_available = TRUE)
                   )
               AND (
-                    oh.lunch_start_time IS NULL
-                    OR oh.lunch_end_time IS NULL
-                    OR NOT (:currentTime >= oh.lunch_start_time AND :currentTime < oh.lunch_end_time)
+                    (
+                        :includeEmergencyRooms = TRUE
+                        AND :includeHospitals = FALSE
+                        AND :includePharmacies = FALSE
+                        AND mi.emergency_room_available = TRUE
+                    )
+                    OR (
+                        oh.closed = FALSE
+                        AND (
+                            (oh.open_time < oh.close_time
+                                AND :currentTime >= oh.open_time AND :currentTime < oh.close_time)
+                            OR
+                            (oh.open_time > oh.close_time
+                                AND (:currentTime >= oh.open_time OR :currentTime < oh.close_time))
+                        )
+                    )
                   )
-              AND ST_Distance_Sphere(POINT(mi.longitude, mi.latitude), POINT(:lng, :lat)) <= :radiusMeters
+              AND (
+                    :departmentCode IS NULL
+                    OR (
+                        :departmentCode = 'KOREAN_CLINIC'
+                        AND mi.institution_kind_name IN ('한의원', '한방병원')
+                    )
+                    OR (
+                        :departmentCode <> 'KOREAN_CLINIC'
+                        AND LOCATE(
+                            CONCAT('|', :departmentCode, '|'),
+                            CONCAT('|', COALESCE(mi.department_codes, ''), '|')
+                        ) > 0
+                    )
+                  )
+              AND (
+                    :operatingSchedule = 'ALL'
+                    OR (:operatingSchedule = 'NIGHT' AND mi.night_service = TRUE)
+                    OR (:operatingSchedule = 'TWENTY_FOUR_HOURS' AND mi.twenty_four_hours = TRUE)
+                    OR (:operatingSchedule = 'SATURDAY' AND mi.saturday_service = TRUE)
+                    OR (:operatingSchedule = 'SUNDAY' AND mi.sunday_service = TRUE)
+                    OR (:operatingSchedule = 'HOLIDAY' AND mi.holiday_service = TRUE)
+                  )
+              AND mi.latitude BETWEEN
+                    :lat - (:radiusMeters / 111320.0)
+                    AND :lat + (:radiusMeters / 111320.0)
+              AND mi.longitude BETWEEN
+                    :lng - (:radiusMeters / (111320.0 * GREATEST(COS(RADIANS(:lat)), 0.01)))
+                    AND :lng + (:radiusMeters / (111320.0 * GREATEST(COS(RADIANS(:lat)), 0.01)))
+              AND ST_Distance_Sphere(
+                    POINT(mi.longitude, mi.latitude),
+                    POINT(:lng, :lat)
+                  ) <= :radiusMeters
             ORDER BY distanceMeters ASC
             """,
             countQuery = """
             SELECT COUNT(*)
             FROM medical_institutions mi
-            JOIN operating_hours oh ON oh.institution_id = mi.id
-            WHERE mi.active = true
-              AND mi.type IN (:types)
-              AND oh.day_of_week = :dayOfWeek
-              AND oh.closed = false
+            LEFT JOIN operating_hours oh
+              ON oh.institution_id = mi.id
+             AND oh.day_of_week = :dayOfWeek
+            WHERE mi.active = TRUE
               AND (
-                    (oh.open_time <= oh.close_time AND :currentTime >= oh.open_time AND :currentTime < oh.close_time)
-                    OR
-                    (oh.open_time > oh.close_time AND (:currentTime >= oh.open_time OR :currentTime < oh.close_time))
+                    (:includeHospitals = TRUE AND mi.type = 'HOSPITAL')
+                    OR (:includePharmacies = TRUE AND mi.type = 'PHARMACY')
+                    OR (:includeEmergencyRooms = TRUE AND mi.emergency_room_available = TRUE)
                   )
               AND (
-                    oh.lunch_start_time IS NULL
-                    OR oh.lunch_end_time IS NULL
-                    OR NOT (:currentTime >= oh.lunch_start_time AND :currentTime < oh.lunch_end_time)
+                    (
+                        :includeEmergencyRooms = TRUE
+                        AND :includeHospitals = FALSE
+                        AND :includePharmacies = FALSE
+                        AND mi.emergency_room_available = TRUE
+                    )
+                    OR (
+                        oh.closed = FALSE
+                        AND (
+                            (oh.open_time < oh.close_time
+                                AND :currentTime >= oh.open_time AND :currentTime < oh.close_time)
+                            OR
+                            (oh.open_time > oh.close_time
+                                AND (:currentTime >= oh.open_time OR :currentTime < oh.close_time))
+                        )
+                    )
                   )
-              AND ST_Distance_Sphere(POINT(mi.longitude, mi.latitude), POINT(:lng, :lat)) <= :radiusMeters
+              AND (
+                    :departmentCode IS NULL
+                    OR (
+                        :departmentCode = 'KOREAN_CLINIC'
+                        AND mi.institution_kind_name IN ('한의원', '한방병원')
+                    )
+                    OR (
+                        :departmentCode <> 'KOREAN_CLINIC'
+                        AND LOCATE(
+                            CONCAT('|', :departmentCode, '|'),
+                            CONCAT('|', COALESCE(mi.department_codes, ''), '|')
+                        ) > 0
+                    )
+                  )
+              AND (
+                    :operatingSchedule = 'ALL'
+                    OR (:operatingSchedule = 'NIGHT' AND mi.night_service = TRUE)
+                    OR (:operatingSchedule = 'TWENTY_FOUR_HOURS' AND mi.twenty_four_hours = TRUE)
+                    OR (:operatingSchedule = 'SATURDAY' AND mi.saturday_service = TRUE)
+                    OR (:operatingSchedule = 'SUNDAY' AND mi.sunday_service = TRUE)
+                    OR (:operatingSchedule = 'HOLIDAY' AND mi.holiday_service = TRUE)
+                  )
+              AND mi.latitude BETWEEN
+                    :lat - (:radiusMeters / 111320.0)
+                    AND :lat + (:radiusMeters / 111320.0)
+              AND mi.longitude BETWEEN
+                    :lng - (:radiusMeters / (111320.0 * GREATEST(COS(RADIANS(:lat)), 0.01)))
+                    AND :lng + (:radiusMeters / (111320.0 * GREATEST(COS(RADIANS(:lat)), 0.01)))
+              AND ST_Distance_Sphere(
+                    POINT(mi.longitude, mi.latitude),
+                    POINT(:lng, :lat)
+                  ) <= :radiusMeters
             """,
             nativeQuery = true)
     Page<NearbyInstitutionRow> findOpenNearby(
             @Param("lat") double lat,
             @Param("lng") double lng,
             @Param("radiusMeters") int radiusMeters,
-            @Param("types") List<String> types,
+            @Param("includeHospitals") boolean includeHospitals,
+            @Param("includePharmacies") boolean includePharmacies,
+            @Param("includeEmergencyRooms") boolean includeEmergencyRooms,
             @Param("dayOfWeek") String dayOfWeek,
             @Param("currentTime") LocalTime currentTime,
+            @Param("departmentCode") String departmentCode,
+            @Param("operatingSchedule") String operatingSchedule,
             Pageable pageable
     );
 

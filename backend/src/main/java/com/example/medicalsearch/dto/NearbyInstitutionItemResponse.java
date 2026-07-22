@@ -1,13 +1,17 @@
 package com.example.medicalsearch.dto;
 
 import com.example.medicalsearch.entity.InstitutionType;
+import com.example.medicalsearch.entity.HospitalDepartment;
 import com.example.medicalsearch.entity.OperatingScheduleFilter;
 import com.example.medicalsearch.repository.NearbyInstitutionRow;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public record NearbyInstitutionItemResponse(
         Long id,
@@ -34,8 +38,8 @@ public record NearbyInstitutionItemResponse(
                 row.getId(),
                 InstitutionType.valueOf(row.getType()),
                 row.getName(),
-                inferInstitutionKind(InstitutionType.valueOf(row.getType()), row.getName()),
-                inferMedicalDepartments(InstitutionType.valueOf(row.getType()), row.getName()),
+                row.getInstitutionKind(),
+                parseMedicalDepartments(row.getMedicalDepartmentCodes()),
                 row.getPhoneNumber(),
                 row.getRoadAddress(),
                 row.getLatitude(),
@@ -46,60 +50,39 @@ public record NearbyInstitutionItemResponse(
                 row.getTodayOpenTime(),
                 row.getTodayCloseTime(),
                 null,
-                Set.of(),
+                operatingSchedules(row),
                 row.getLastSyncedAt()
         );
     }
 
-    private static String inferInstitutionKind(InstitutionType type, String name) {
-        if (type == InstitutionType.PHARMACY || name == null) {
-            return null;
-        }
-        if (name.contains("종합병원")) {
-            return "종합병원";
-        }
-        if (name.contains("한의원")) {
-            return "한의원";
-        }
-        if (name.contains("치과")) {
-            return "치과의원";
-        }
-        if (name.contains("의원")) {
-            return "의원";
-        }
-        return type == InstitutionType.EMERGENCY_ROOM ? "응급의료기관" : "병원";
-    }
-
-    private static Set<String> inferMedicalDepartments(InstitutionType type, String name) {
-        if (type != InstitutionType.HOSPITAL || name == null) {
+    private static Set<String> parseMedicalDepartments(String departmentCodes) {
+        if (departmentCodes == null || departmentCodes.isBlank()) {
             return Set.of();
         }
-        String normalized = name.replaceAll("\\s+", "");
-        Set<String> specialties = new LinkedHashSet<>();
-        if (normalized.contains("이비인후과")) {
-            specialties.add("이비인후과");
+        return Arrays.stream(departmentCodes.split("\\|"))
+                .map(String::trim)
+                .filter(part -> !part.isEmpty())
+                .map(HospitalDepartment::officialNameFor)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private static Set<OperatingScheduleFilter> operatingSchedules(NearbyInstitutionRow row) {
+        Set<OperatingScheduleFilter> schedules = EnumSet.noneOf(OperatingScheduleFilter.class);
+        addIfTrue(schedules, row.getNightService(), OperatingScheduleFilter.NIGHT);
+        addIfTrue(schedules, row.getTwentyFourHours(), OperatingScheduleFilter.TWENTY_FOUR_HOURS);
+        addIfTrue(schedules, row.getSaturdayService(), OperatingScheduleFilter.SATURDAY);
+        addIfTrue(schedules, row.getSundayService(), OperatingScheduleFilter.SUNDAY);
+        addIfTrue(schedules, row.getHolidayService(), OperatingScheduleFilter.HOLIDAY);
+        return Set.copyOf(schedules);
+    }
+
+    private static void addIfTrue(
+            Set<OperatingScheduleFilter> schedules,
+            Boolean enabled,
+            OperatingScheduleFilter schedule
+    ) {
+        if (Boolean.TRUE.equals(enabled)) {
+            schedules.add(schedule);
         }
-        if (normalized.contains("소아청소년과")) {
-            specialties.add("소아과");
-        }
-        if (normalized.contains("내과")) {
-            specialties.add("내과");
-        }
-        if (normalized.contains("안과")) {
-            specialties.add("안과");
-        }
-        if (normalized.contains("피부과")) {
-            specialties.add("피부과");
-        }
-        if (normalized.contains("산부인과")) {
-            specialties.add("산부인과");
-        }
-        if (normalized.contains("정형외과")) {
-            specialties.add("정형외과");
-        }
-        if (normalized.contains("외과") && !normalized.contains("정형외과")) {
-            specialties.add("외과");
-        }
-        return Set.copyOf(specialties);
     }
 }

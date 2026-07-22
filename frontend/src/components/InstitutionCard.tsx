@@ -18,6 +18,11 @@ function InstitutionCard({ institution, favorite, selected, onFavorite, onSelect
   const meta = TYPE_META[institution.type];
   const TypeIcon = TYPE_ICONS[institution.type];
   const typeClass = institution.type.toLowerCase();
+  const typeBadgeLabel = institution.type === 'HOSPITAL'
+    ? institution.medicalDepartments.length > 0
+      ? institution.medicalDepartments.join(' · ')
+      : institution.institutionKind ?? meta.label
+    : meta.label;
   const hoursText = institution.todayOpenTime && institution.todayCloseTime
     ? `${formatTime(institution.todayOpenTime)} ~ ${formatTime(institution.todayCloseTime)}`
     : institution.operatingHoursKnown ? '오늘 휴무' : '정보 없음';
@@ -32,13 +37,9 @@ function InstitutionCard({ institution, favorite, selected, onFavorite, onSelect
           <h2>{institution.name}</h2>
           <span
             className="type-badge"
-            title={institution.type === 'HOSPITAL' && institution.institutionKind
-              ? institution.institutionKind
-              : meta.label}
+            title={typeBadgeLabel}
           >
-            {institution.type === 'HOSPITAL' && institution.institutionKind
-              ? institution.institutionKind
-              : meta.label}
+            {typeBadgeLabel}
           </span>
           {institution.type === 'EMERGENCY_ROOM'
             && institution.institutionKind

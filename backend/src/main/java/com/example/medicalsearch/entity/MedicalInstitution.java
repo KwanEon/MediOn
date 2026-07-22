@@ -27,7 +27,7 @@ public class MedicalInstitution {
     private Long id;
 
     @Column(nullable = false, unique = true, length = 100)
-    private String externalId;
+    private String hpid;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
@@ -39,20 +39,73 @@ public class MedicalInstitution {
     @Column(length = 30)
     private String phoneNumber;
 
+    @Column(length = 10)
+    private String institutionKindCode;
+
+    @Column(length = 50)
+    private String institutionKindName;
+
+    @Column(length = 255)
+    private String departmentCodes;
+
+    @Column(length = 10)
+    private String emergencyClassCode;
+
+    @Column(length = 100)
+    private String emergencyClassName;
+
+    @Column(nullable = false)
+    private boolean emergencyRoomAvailable;
+
+    @Column(length = 30)
+    private String emergencyPhone;
+
+    @Column(length = 10)
+    private String postalCode;
+
+    @Column(columnDefinition = "TEXT")
+    private String note;
+
+    @Column(columnDefinition = "TEXT")
+    private String mapDescription;
+
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
     @Column(length = 255)
     private String roadAddress;
 
     @Column(length = 255)
     private String lotAddress;
 
-    @Column(nullable = false, precision = 10, scale = 7)
+    @Column(precision = 10, scale = 7)
     private BigDecimal latitude;
 
-    @Column(nullable = false, precision = 10, scale = 7)
+    @Column(precision = 10, scale = 7)
     private BigDecimal longitude;
 
     @Column(nullable = false)
     private boolean active;
+
+    @Column(nullable = false)
+    private boolean nightService;
+
+    @Column(nullable = false)
+    private boolean twentyFourHours;
+
+    @Column(nullable = false)
+    private boolean saturdayService;
+
+    @Column(nullable = false)
+    private boolean sundayService;
+
+    @Column(nullable = false)
+    private boolean holidayService;
+
+    @Column(length = 36)
+    private String lastSeenSyncId;
+
+    private LocalDateTime inactiveAt;
 
     @Column(nullable = false)
     private LocalDateTime lastSyncedAt;

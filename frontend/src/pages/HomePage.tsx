@@ -4,7 +4,6 @@ import MedicalMap from '../components/MedicalMap';
 import ResultsPanel from '../components/ResultsPanel';
 import SearchPanel from '../components/SearchPanel';
 import StatusNotice from '../components/StatusNotice';
-import { getHospitalDepartmentLabel } from '../constants/institutions';
 import { useAuthStore } from '../store/useAuthStore';
 import { useMedicalSearchStore } from '../store/useMedicalSearchStore';
 import type { CategoryId } from '../types/institution';
@@ -42,17 +41,12 @@ function HomePage({ initialCategory = 'ALL' }: HomePageProps) {
   const institutions = response?.items ?? [];
   const visibleInstitutions = useMemo(() => {
     const normalizedKeyword = submittedKeyword.trim().toLowerCase();
-    const hospitalDepartmentLabel = getHospitalDepartmentLabel(selectedHospitalDepartment);
-
     const filteredInstitutions = institutions.filter((institution) => {
       const medicalDepartments = institution.medicalDepartments ?? [];
       const searchableText = `${institution.name} ${institution.roadAddress ?? ''} ${institution.institutionKind ?? ''} ${medicalDepartments.join(' ')}`.toLowerCase();
       const matchesKeyword = !normalizedKeyword || searchableText.includes(normalizedKeyword);
       const matchesFavorite = !favoritesOnly || favorites.includes(institution.id);
-      const matchesHospitalDepartment = !hospitalDepartmentLabel
-        || (institution.type === 'HOSPITAL'
-          && medicalDepartments.includes(hospitalDepartmentLabel));
-      return matchesKeyword && matchesFavorite && matchesHospitalDepartment;
+      return matchesKeyword && matchesFavorite;
     });
 
     return filteredInstitutions.sort(
@@ -62,7 +56,6 @@ function HomePage({ initialCategory = 'ALL' }: HomePageProps) {
     favorites,
     favoritesOnly,
     institutions,
-    selectedHospitalDepartment,
     submittedKeyword
   ]);
 

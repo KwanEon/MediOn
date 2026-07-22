@@ -1,7 +1,6 @@
 package com.example.medicalsearch.config;
 
 import com.example.medicalsearch.client.AddressGeocodingException;
-import com.example.medicalsearch.client.OpenStreetMapClientException;
 import com.example.medicalsearch.client.PublicDataClientException;
 import com.example.medicalsearch.dto.ErrorResponse;
 import com.example.medicalsearch.dto.FieldErrorResponse;
@@ -79,17 +78,6 @@ public class GlobalExceptionHandler {
                 HttpStatus.SERVICE_UNAVAILABLE.value(),
                 HttpStatus.SERVICE_UNAVAILABLE.getReasonPhrase(),
                 exception.getMessage()
-        );
-        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
-    }
-
-    @ExceptionHandler(OpenStreetMapClientException.class)
-    ResponseEntity<ErrorResponse> handleOpenStreetMapClient(OpenStreetMapClientException exception) {
-        log.warn("실제 의료기관 조회 실패: {}", exception.getMessage());
-        ErrorResponse response = ErrorResponse.of(
-                HttpStatus.SERVICE_UNAVAILABLE.value(),
-                HttpStatus.SERVICE_UNAVAILABLE.getReasonPhrase(),
-                "실제 의료기관 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
         );
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
     }

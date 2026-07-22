@@ -11,7 +11,6 @@ public record AppProperties(
         ZoneId timeZone,
         Cors cors,
         PublicData publicData,
-        OpenStreetMap openStreetMap,
         NaverMaps naverMaps
 ) {
 
@@ -21,29 +20,12 @@ public record AppProperties(
     public record PublicData(
             boolean enabled,
             String serviceKey,
-            boolean hospitalLocationEnabled,
-            boolean emergencyMedicalEnabled,
-            URI hospitalUrl,
-            URI hospitalListUrl,
-            URI pharmacyUrl,
-            URI pharmacyListUrl,
-            URI emergencyUrl,
-            URI emergencyListUrl,
-            URI emergencyAvailabilityUrl,
+            URI hospitalFullDataUrl,
+            URI hospitalDepartmentListUrl,
+            URI pharmacyFullDataUrl,
             Duration timeout,
-            Duration cacheTtl,
-            Duration emergencyAvailabilityCacheTtl,
-            Duration operatingHoursCacheTtl,
-            int maxOperatingHoursRows,
-            int maxResults
-    ) {
-    }
-
-    public record OpenStreetMap(
-            boolean enabled,
-            URI overpassUrl,
-            List<URI> fallbackUrls,
-            Duration timeout
+            int syncPageSize,
+            boolean syncOnStartup
     ) {
     }
 

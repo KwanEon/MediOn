@@ -12,6 +12,10 @@ public interface NearbyInstitutionRow {
 
     String getName();
 
+    String getInstitutionKind();
+
+    String getMedicalDepartmentCodes();
+
     String getPhoneNumber();
 
     String getRoadAddress();
@@ -25,6 +29,16 @@ public interface NearbyInstitutionRow {
     LocalTime getTodayOpenTime();
 
     LocalTime getTodayCloseTime();
+
+    Boolean getNightService();
+
+    Boolean getTwentyFourHours();
+
+    Boolean getSaturdayService();
+
+    Boolean getSundayService();
+
+    Boolean getHolidayService();
 
     LocalDateTime getLastSyncedAt();
 }
