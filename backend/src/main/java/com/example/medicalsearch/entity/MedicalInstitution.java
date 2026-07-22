@@ -10,17 +10,15 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-@Getter
 @Entity
 @Table(name = "medical_institutions")
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class MedicalInstitution {
+
+    protected MedicalInstitution() {
+    }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -39,44 +37,14 @@ public class MedicalInstitution {
     @Column(length = 30)
     private String phoneNumber;
 
-    @Column(length = 10)
-    private String institutionKindCode;
-
     @Column(length = 50)
     private String institutionKindName;
-
-    @Column(length = 255)
-    private String departmentCodes;
-
-    @Column(length = 10)
-    private String emergencyClassCode;
-
-    @Column(length = 100)
-    private String emergencyClassName;
 
     @Column(nullable = false)
     private boolean emergencyRoomAvailable;
 
-    @Column(length = 30)
-    private String emergencyPhone;
-
-    @Column(length = 10)
-    private String postalCode;
-
-    @Column(columnDefinition = "TEXT")
-    private String note;
-
-    @Column(columnDefinition = "TEXT")
-    private String mapDescription;
-
-    @Column(columnDefinition = "TEXT")
-    private String description;
-
     @Column(length = 255)
     private String roadAddress;
-
-    @Column(length = 255)
-    private String lotAddress;
 
     @Column(precision = 10, scale = 7)
     private BigDecimal latitude;

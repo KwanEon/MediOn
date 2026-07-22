@@ -26,23 +26,25 @@ public class InstitutionSearchController {
     }
 
     @GetMapping("/nearby")
-    public NearbyInstitutionResponse searchOpenNearby(
+    public NearbyInstitutionResponse searchNearby(
             @RequestParam double lat,
             @RequestParam double lng,
             @RequestParam(required = false) Integer radiusMeters,
-            @RequestParam(defaultValue = "HOSPITAL,PHARMACY") List<InstitutionType> types,
+            @RequestParam(defaultValue = "HOSPITAL,PHARMACY,EMERGENCY_ROOM") List<InstitutionType> types,
             @RequestParam(required = false) HospitalDepartment hospitalDepartment,
             @RequestParam(defaultValue = "ALL") OperatingScheduleFilter operatingSchedule,
+            @RequestParam(defaultValue = "true") boolean openNowOnly,
             @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size
+            @RequestParam(defaultValue = "100") @Min(1) @Max(500) int size
     ) {
-        return institutionSearchService.searchOpenNearby(
+        return institutionSearchService.searchNearby(
                 lat,
                 lng,
                 radiusMeters,
                 types,
                 hospitalDepartment,
                 operatingSchedule,
+                openNowOnly,
                 page,
                 size
         );

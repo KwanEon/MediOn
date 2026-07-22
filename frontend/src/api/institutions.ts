@@ -4,7 +4,7 @@ interface ApiErrorResponse {
   message?: string;
 }
 
-const MAX_SEARCH_RESULTS = 100;
+const MAX_SEARCH_RESULTS = 500;
 
 export async function fetchAllNearbyInstitutions(
   searchParams: NearbyInstitutionSearchParams
@@ -20,9 +20,10 @@ export async function fetchNearbyInstitutions({
   lat,
   lng,
   radiusMeters = 3000,
-  types = ['HOSPITAL', 'PHARMACY'],
+  types = ['HOSPITAL', 'PHARMACY', 'EMERGENCY_ROOM'],
   hospitalDepartment,
   operatingSchedule = 'ALL',
+  openNowOnly = true,
   page = 0,
   size = 20
 }: NearbyInstitutionSearchParams): Promise<NearbyInstitutionResponse> {
@@ -32,6 +33,7 @@ export async function fetchNearbyInstitutions({
     radiusMeters: String(radiusMeters),
     types: types.join(','),
     operatingSchedule,
+    openNowOnly: String(openNowOnly),
     page: String(page),
     size: String(size)
   });

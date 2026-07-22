@@ -42,6 +42,7 @@ public class PharmacyDataSyncService {
     @EventListener(ApplicationReadyEvent.class)
     public void synchronizeOnStartup() {
         if (!fullDataClient.isEnabled()) {
+            log.info("PUBLIC_DATA_ENABLED=false여서 약국 FullData 동기화를 건너뜁니다.");
             return;
         }
         boolean pharmacyTableEmpty = syncWriter.isPharmacyTableEmpty();
@@ -67,7 +68,7 @@ public class PharmacyDataSyncService {
     )
     public void synchronize() {
         if (!fullDataClient.isEnabled()) {
-            log.warn("공공데이터 서비스 키가 없어 약국 FullData 동기화를 건너뜁니다.");
+            log.info("PUBLIC_DATA_ENABLED=false여서 약국 FullData 동기화를 건너뜁니다.");
             return;
         }
         if (!synchronizationRunning.compareAndSet(false, true)) {

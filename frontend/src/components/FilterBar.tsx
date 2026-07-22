@@ -4,8 +4,10 @@ import {
   CalendarClock,
   Check,
   ChevronDown,
+  Clock3,
   Grid2X2,
   Hospital,
+  ListFilter,
   MapPin,
   Pill,
   Star,
@@ -31,6 +33,11 @@ const RADIUS_OPTIONS = [
   { value: '5000', label: '반경 5km' }
 ] as const;
 
+const RESULT_SIZE_OPTIONS = [100, 200, 300, 400, 500].map((size) => ({
+  value: String(size),
+  label: `${size}개`
+}));
+
 const OPERATING_SCHEDULE_OPTIONS = [
   { value: 'ALL', label: '전체' },
   { value: 'NIGHT', label: '야간진료' },
@@ -46,6 +53,8 @@ function FilterBar() {
   const selectedHospitalDepartment = useMedicalSearchStore((state) => state.selectedHospitalDepartment);
   const radiusMeters = useMedicalSearchStore((state) => state.radiusMeters);
   const operatingSchedule = useMedicalSearchStore((state) => state.operatingSchedule);
+  const openNowOnly = useMedicalSearchStore((state) => state.openNowOnly);
+  const resultSize = useMedicalSearchStore((state) => state.resultSize);
   const favoritesOnly = useMedicalSearchStore((state) => state.favoritesOnly);
   const setSelectedCategory = useMedicalSearchStore((state) => state.setSelectedCategory);
   const setSelectedHospitalDepartment = useMedicalSearchStore(
@@ -53,6 +62,8 @@ function FilterBar() {
   );
   const setRadiusMeters = useMedicalSearchStore((state) => state.setRadiusMeters);
   const setOperatingSchedule = useMedicalSearchStore((state) => state.setOperatingSchedule);
+  const setOpenNowOnly = useMedicalSearchStore((state) => state.setOpenNowOnly);
+  const setResultSize = useMedicalSearchStore((state) => state.setResultSize);
   const setFavoritesOnly = useMedicalSearchStore((state) => state.setFavoritesOnly);
 
   return (
@@ -87,6 +98,15 @@ function FilterBar() {
             내 즐겨찾기
           </button>
         )}
+        <button
+          className={openNowOnly ? 'open-now-filter-button is-active' : 'open-now-filter-button'}
+          type="button"
+          aria-pressed={openNowOnly}
+          onClick={() => setOpenNowOnly(!openNowOnly)}
+        >
+          <Clock3 size={18} />
+          진료 중
+        </button>
         <FilterDropdown
           ariaLabel="진료과목 종류"
           className="hospital-kind-select-control"
@@ -101,6 +121,14 @@ function FilterBar() {
           value={String(radiusMeters)}
           options={RADIUS_OPTIONS}
           onChange={(value) => setRadiusMeters(Number(value))}
+        />
+        <FilterDropdown
+          ariaLabel="검색 결과 개수"
+          className="result-size-select-control"
+          icon={ListFilter}
+          value={String(resultSize)}
+          options={RESULT_SIZE_OPTIONS}
+          onChange={(value) => setResultSize(Number(value))}
         />
         <FilterDropdown
           ariaLabel="야간 및 휴일 진료"

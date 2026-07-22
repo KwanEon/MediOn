@@ -46,10 +46,6 @@ public enum HospitalDepartment {
         this.displayName = displayName;
     }
 
-    public String getDisplayName() {
-        return displayName;
-    }
-
     public String getPublicDataCode() {
         return publicDataCode;
     }

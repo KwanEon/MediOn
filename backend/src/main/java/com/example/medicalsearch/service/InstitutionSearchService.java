@@ -8,13 +8,14 @@ import java.util.List;
 
 public interface InstitutionSearchService {
 
-    NearbyInstitutionResponse searchOpenNearby(
+    NearbyInstitutionResponse searchNearby(
             double lat,
             double lng,
             Integer radiusMeters,
             List<InstitutionType> types,
             HospitalDepartment hospitalDepartment,
             OperatingScheduleFilter operatingSchedule,
+            boolean openNowOnly,
             int page,
             int size
     );

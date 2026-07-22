@@ -8,6 +8,8 @@ public interface NearbyInstitutionRow {
 
     Long getId();
 
+    String getHpid();
+
     String getType();
 
     String getName();
@@ -25,6 +27,10 @@ public interface NearbyInstitutionRow {
     BigDecimal getLongitude();
 
     Double getDistanceMeters();
+
+    Long getOpenNow();
+
+    Long getOperatingHoursKnown();
 
     LocalTime getTodayOpenTime();
 

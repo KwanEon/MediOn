@@ -43,7 +43,7 @@ export type HospitalDepartmentId =
   | 'PREVENTIVE_MEDICINE'
   | 'KOREAN_CLINIC';
 
-export type InstitutionId = number | string;
+export type InstitutionId = number;
 
 export interface Coordinates {
   lat: number;
@@ -90,6 +90,7 @@ export interface NearbyInstitutionSearchParams extends Coordinates {
   types?: readonly InstitutionType[];
   hospitalDepartment?: Exclude<HospitalDepartmentId, 'ALL'>;
   operatingSchedule?: OperatingScheduleFilter;
+  openNowOnly?: boolean;
   page?: number;
   size?: number;
 }

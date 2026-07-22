@@ -5,6 +5,7 @@ import com.example.medicalsearch.client.NaverMapsGeocodingClient.GeocodedAddress
 import com.example.medicalsearch.dto.AuthUserResponse;
 import com.example.medicalsearch.dto.AddressSearchItemResponse;
 import com.example.medicalsearch.dto.RegisterRequest;
+import com.example.medicalsearch.dto.UpdateAddressRequest;
 import com.example.medicalsearch.entity.AppUser;
 import com.example.medicalsearch.repository.AppUserRepository;
 import java.time.LocalDateTime;
@@ -65,6 +66,19 @@ public class AuthService implements UserDetailsService {
     @Transactional(readOnly = true)
     public AuthUserResponse getUser(String username) {
         return AuthUserResponse.from(findUser(username));
+    }
+
+    @Transactional
+    public AuthUserResponse updateAddress(String username, UpdateAddressRequest request) {
+        GeocodedAddress geocodedAddress = geocodingClient.geocode(request.address());
+        AppUser user = findUser(username);
+        user.updateAddress(
+                geocodedAddress.address(),
+                geocodedAddress.latitude(),
+                geocodedAddress.longitude(),
+                LocalDateTime.now()
+        );
+        return AuthUserResponse.from(user);
     }
 
     public List<AddressSearchItemResponse> searchAddresses(String query) {

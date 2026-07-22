@@ -19,18 +19,14 @@ public class MedicalInstitutionSyncWriter {
 
     private static final String UPSERT_INSTITUTION_SQL = """
             INSERT INTO medical_institutions (
-                hpid, type, name, institution_kind_code, institution_kind_name,
-                emergency_class_code, emergency_class_name, emergency_room_available,
-                phone_number, emergency_phone, road_address, lot_address, postal_code,
-                note, map_description, description, latitude, longitude,
+                hpid, type, name, institution_kind_name, emergency_room_available,
+                phone_number, road_address, latitude, longitude,
                 night_service, twenty_four_hours, saturday_service, sunday_service,
                 holiday_service, active, last_seen_sync_id, inactive_at,
                 last_synced_at, created_at, updated_at
             ) VALUES (
-                :hpid, :type, :name, :institutionKindCode, :institutionKindName,
-                :emergencyClassCode, :emergencyClassName, :emergencyRoomAvailable,
-                :phoneNumber, :emergencyPhone, :roadAddress, NULL, :postalCode,
-                :note, :mapDescription, :description, :latitude, :longitude,
+                :hpid, :type, :name, :institutionKindName, :emergencyRoomAvailable,
+                :phoneNumber, :roadAddress, :latitude, :longitude,
                 :nightService, :twentyFourHours, :saturdayService, :sundayService,
                 :holidayService, TRUE, :syncRunId, NULL,
                 :syncedAt, :syncedAt, :syncedAt
@@ -38,18 +34,10 @@ public class MedicalInstitutionSyncWriter {
             ON DUPLICATE KEY UPDATE
                 type = VALUES(type),
                 name = VALUES(name),
-                institution_kind_code = VALUES(institution_kind_code),
                 institution_kind_name = VALUES(institution_kind_name),
-                emergency_class_code = VALUES(emergency_class_code),
-                emergency_class_name = VALUES(emergency_class_name),
                 emergency_room_available = VALUES(emergency_room_available),
                 phone_number = VALUES(phone_number),
-                emergency_phone = VALUES(emergency_phone),
                 road_address = VALUES(road_address),
-                postal_code = VALUES(postal_code),
-                note = VALUES(note),
-                map_description = VALUES(map_description),
-                description = VALUES(description),
                 latitude = COALESCE(VALUES(latitude), latitude),
                 longitude = COALESCE(VALUES(longitude), longitude),
                 night_service = VALUES(night_service),
@@ -66,44 +54,26 @@ public class MedicalInstitutionSyncWriter {
 
     private static final String UPSERT_OPERATING_HOURS_SQL = """
             INSERT INTO operating_hours (
-                institution_id, day_of_week, open_time, close_time, closed,
-                lunch_start_time, lunch_end_time
+                institution_id, day_of_week, open_time, close_time, closed
             )
-            SELECT id, :dayOfWeek, :openTime, :closeTime, :closed, NULL, NULL
+            SELECT id, :dayOfWeek, :openTime, :closeTime, :closed
             FROM medical_institutions
             WHERE hpid = :hpid
             ON DUPLICATE KEY UPDATE
                 open_time = VALUES(open_time),
                 close_time = VALUES(close_time),
-                closed = VALUES(closed),
-                lunch_start_time = NULL,
-                lunch_end_time = NULL
+                closed = VALUES(closed)
             """;
 
     private static final String UPSERT_DEPARTMENT_SQL = """
             INSERT INTO medical_institution_departments (
-                institution_id, department_code, last_seen_sync_id, updated_at
+                institution_id, department_code, last_seen_sync_id
             )
-            SELECT id, :departmentCode, :syncRunId, :syncedAt
+            SELECT id, :departmentCode, :syncRunId
             FROM medical_institutions
             WHERE hpid = :hpid
             ON DUPLICATE KEY UPDATE
-                last_seen_sync_id = VALUES(last_seen_sync_id),
-                updated_at = VALUES(updated_at)
-            """;
-
-    private static final String APPEND_INSTITUTION_DEPARTMENT_CODE_SQL = """
-            UPDATE medical_institutions
-            SET department_codes = CASE
-                WHEN department_codes IS NULL OR department_codes = '' THEN :departmentCode
-                WHEN LOCATE(
-                    CONCAT('|', :departmentCode, '|'),
-                    CONCAT('|', department_codes, '|')
-                ) > 0 THEN department_codes
-                ELSE CONCAT(department_codes, '|', :departmentCode)
-            END
-            WHERE hpid = :hpid
-              AND type = 'HOSPITAL'
+                last_seen_sync_id = VALUES(last_seen_sync_id)
             """;
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
@@ -168,8 +138,7 @@ public class MedicalInstitutionSyncWriter {
     public void upsertDepartments(
             String departmentCode,
             List<String> hpids,
-            String syncRunId,
-            LocalDateTime syncedAt
+            String syncRunId
     ) {
         if (hpids.isEmpty()) {
             return;
@@ -178,11 +147,9 @@ public class MedicalInstitutionSyncWriter {
                 .map(hpid -> new MapSqlParameterSource()
                         .addValue("hpid", hpid)
                         .addValue("departmentCode", departmentCode)
-                        .addValue("syncRunId", syncRunId)
-                        .addValue("syncedAt", syncedAt))
+                        .addValue("syncRunId", syncRunId))
                 .toArray(SqlParameterSource[]::new);
         jdbcTemplate.batchUpdate(UPSERT_DEPARTMENT_SQL, parameters);
-        jdbcTemplate.batchUpdate(APPEND_INSTITUTION_DEPARTMENT_CODE_SQL, parameters);
     }
 
     @Transactional
@@ -227,32 +194,12 @@ public class MedicalInstitutionSyncWriter {
                 """, new MapSqlParameterSource("syncRunId", syncRunId));
     }
 
-    @Transactional
-    public int refreshInstitutionDepartmentCodes() {
-        return jdbcTemplate.update("""
-                UPDATE medical_institutions institution
-                LEFT JOIN (
-                    SELECT institution_id,
-                           GROUP_CONCAT(
-                               department_code
-                               ORDER BY department_code
-                               SEPARATOR '|'
-                           ) AS department_codes
-                    FROM medical_institution_departments
-                    GROUP BY institution_id
-                ) departments ON departments.institution_id = institution.id
-                SET institution.department_codes = departments.department_codes
-                WHERE institution.type = 'HOSPITAL'
-                """, new MapSqlParameterSource());
-    }
-
-    public boolean hasSuccessfulSyncSince(LocalDateTime since) {
+    public boolean hasHospitalSyncAttemptSince(LocalDateTime since) {
         Integer count = jdbcTemplate.queryForObject("""
                 SELECT COUNT(*)
                 FROM data_sync_histories
                 WHERE source_name = 'NATIONAL_MEDICAL_CENTER_FULL_DATA'
-                  AND target_type = 'HOSPITAL'
-                  AND status = 'SUCCESS'
+                  AND target_type IN ('HOSPITAL', 'HOSPITAL_BASE')
                   AND synced_at >= :since
                 """, new MapSqlParameterSource("since", since), Integer.class);
         return count != null && count > 0;
@@ -264,8 +211,17 @@ public class MedicalInstitutionSyncWriter {
                     SELECT 1
                     FROM data_sync_histories
                     WHERE source_name = 'NATIONAL_MEDICAL_CENTER_FULL_DATA'
-                      AND target_type = 'HOSPITAL'
-                      AND status = 'SUCCESS'
+                      AND (
+                            (target_type IN ('HOSPITAL', 'HOSPITAL_BASE')
+                                AND status = 'SUCCESS')
+                            OR
+                            (target_type = 'HOSPITAL'
+                                AND status = 'FAILED'
+                                AND (
+                                    message LIKE '%진료과목%'
+                                    OR message LIKE '% D0__ API%'
+                                ))
+                          )
                     LIMIT 1
                 )
                 """, new MapSqlParameterSource(), Integer.class);
@@ -303,6 +259,8 @@ public class MedicalInstitutionSyncWriter {
                 SELECT EXISTS (
                     SELECT 1
                     FROM medical_institutions
+                    WHERE type = 'HOSPITAL'
+                      AND active = TRUE
                     LIMIT 1
                 )
                 """, new MapSqlParameterSource(), Integer.class);
@@ -323,22 +281,32 @@ public class MedicalInstitutionSyncWriter {
     }
 
     @Transactional
+    public void recordHospitalBaseHistory(
+            LocalDateTime syncedAt,
+            String message
+    ) {
+        insertHistory(
+                "NATIONAL_MEDICAL_CENTER_FULL_DATA",
+                "HOSPITAL_BASE",
+                DataSyncStatus.SUCCESS,
+                syncedAt,
+                message
+        );
+    }
+
+    @Transactional
     public void recordHistory(
             DataSyncStatus status,
             LocalDateTime syncedAt,
             String message
     ) {
-        jdbcTemplate.update("""
-                INSERT INTO data_sync_histories (
-                    source_name, target_type, status, synced_at, message
-                ) VALUES (
-                    'NATIONAL_MEDICAL_CENTER_FULL_DATA', 'HOSPITAL',
-                    :status, :syncedAt, :message
-                )
-                """, new MapSqlParameterSource()
-                .addValue("status", status.name())
-                .addValue("syncedAt", syncedAt)
-                .addValue("message", truncate(message, 1000)));
+        insertHistory(
+                "NATIONAL_MEDICAL_CENTER_FULL_DATA",
+                "HOSPITAL",
+                status,
+                syncedAt,
+                message
+        );
     }
 
     @Transactional
@@ -347,14 +315,31 @@ public class MedicalInstitutionSyncWriter {
             LocalDateTime syncedAt,
             String message
     ) {
+        insertHistory(
+                "NATIONAL_MEDICAL_CENTER_PHARMACY_FULL_DATA",
+                "PHARMACY",
+                status,
+                syncedAt,
+                message
+        );
+    }
+
+    private void insertHistory(
+            String sourceName,
+            String targetType,
+            DataSyncStatus status,
+            LocalDateTime syncedAt,
+            String message
+    ) {
         jdbcTemplate.update("""
                 INSERT INTO data_sync_histories (
                     source_name, target_type, status, synced_at, message
                 ) VALUES (
-                    'NATIONAL_MEDICAL_CENTER_PHARMACY_FULL_DATA', 'PHARMACY',
-                    :status, :syncedAt, :message
+                    :sourceName, :targetType, :status, :syncedAt, :message
                 )
                 """, new MapSqlParameterSource()
+                .addValue("sourceName", sourceName)
+                .addValue("targetType", targetType)
                 .addValue("status", status.name())
                 .addValue("syncedAt", syncedAt)
                 .addValue("message", truncate(message, 1000)));
@@ -370,18 +355,10 @@ public class MedicalInstitutionSyncWriter {
                 .addValue("hpid", institution.hpid())
                 .addValue("type", type.name())
                 .addValue("name", institution.name())
-                .addValue("institutionKindCode", institution.institutionKindCode())
                 .addValue("institutionKindName", institution.institutionKindName())
-                .addValue("emergencyClassCode", institution.emergencyClassCode())
-                .addValue("emergencyClassName", institution.emergencyClassName())
                 .addValue("emergencyRoomAvailable", institution.emergencyRoomAvailable())
                 .addValue("phoneNumber", institution.phoneNumber())
-                .addValue("emergencyPhone", institution.emergencyPhone())
                 .addValue("roadAddress", institution.roadAddress())
-                .addValue("postalCode", institution.postalCode())
-                .addValue("note", institution.note())
-                .addValue("mapDescription", institution.mapDescription())
-                .addValue("description", institution.description())
                 .addValue("latitude", institution.latitude())
                 .addValue("longitude", institution.longitude())
                 .addValue("nightService", institution.nightService())

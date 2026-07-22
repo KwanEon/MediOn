@@ -15,23 +15,48 @@ public interface MedicalInstitutionRepository extends JpaRepository<MedicalInsti
     @Query(value = """
             SELECT
                 mi.id AS id,
+                mi.hpid AS hpid,
                 CASE
                     WHEN mi.type = 'HOSPITAL'
-                         AND :includeHospitals = FALSE
                          AND :includeEmergencyRooms = TRUE
+                         AND mi.emergency_room_available = TRUE
                     THEN 'EMERGENCY_ROOM'
                     ELSE mi.type
                 END AS type,
                 mi.name AS name,
                 mi.institution_kind_name AS institutionKind,
-                mi.department_codes AS medicalDepartmentCodes,
+                (
+                    SELECT GROUP_CONCAT(
+                        department.department_code
+                        ORDER BY department.department_code
+                        SEPARATOR '|'
+                    )
+                    FROM medical_institution_departments department
+                    WHERE department.institution_id = mi.id
+                ) AS medicalDepartmentCodes,
                 mi.phone_number AS phoneNumber,
                 mi.road_address AS roadAddress,
                 mi.latitude AS latitude,
                 mi.longitude AS longitude,
                 ST_Distance_Sphere(POINT(mi.longitude, mi.latitude), POINT(:lng, :lat)) AS distanceMeters,
-                oh.open_time AS todayOpenTime,
-                oh.close_time AS todayCloseTime,
+                CASE
+                    WHEN :includeEmergencyRooms = TRUE
+                         AND mi.emergency_room_available = TRUE
+                    THEN TRUE
+                    WHEN oh.closed = FALSE
+                         AND (
+                             (oh.open_time < oh.close_time
+                                 AND :currentTime >= oh.open_time AND :currentTime < oh.close_time)
+                             OR
+                             (oh.open_time > oh.close_time
+                                 AND (:currentTime >= oh.open_time OR :currentTime < oh.close_time))
+                         )
+                    THEN TRUE
+                    ELSE FALSE
+                END AS openNow,
+                CASE WHEN oh.id IS NULL THEN FALSE ELSE TRUE END AS operatingHoursKnown,
+                CASE WHEN oh.closed = FALSE THEN oh.open_time ELSE NULL END AS todayOpenTime,
+                CASE WHEN oh.closed = FALSE THEN oh.close_time ELSE NULL END AS todayCloseTime,
                 mi.night_service AS nightService,
                 mi.twenty_four_hours AS twentyFourHours,
                 mi.saturday_service AS saturdayService,
@@ -49,10 +74,33 @@ public interface MedicalInstitutionRepository extends JpaRepository<MedicalInsti
                     OR (:includeEmergencyRooms = TRUE AND mi.emergency_room_available = TRUE)
                   )
               AND (
-                    (
+                    :departmentCode IS NULL
+                    OR (
+                        :departmentCode = 'KOREAN_CLINIC'
+                        AND mi.institution_kind_name IN ('한의원', '한방병원')
+                    )
+                    OR (
+                        :departmentCode <> 'KOREAN_CLINIC'
+                        AND EXISTS (
+                            SELECT 1
+                            FROM medical_institution_departments department_filter
+                            WHERE department_filter.institution_id = mi.id
+                              AND department_filter.department_code = :departmentCode
+                        )
+                    )
+                  )
+              AND (
+                    :operatingSchedule = 'ALL'
+                    OR (:operatingSchedule = 'NIGHT' AND mi.night_service = TRUE)
+                    OR (:operatingSchedule = 'TWENTY_FOUR_HOURS' AND mi.twenty_four_hours = TRUE)
+                    OR (:operatingSchedule = 'SATURDAY' AND mi.saturday_service = TRUE)
+                    OR (:operatingSchedule = 'SUNDAY' AND mi.sunday_service = TRUE)
+                    OR (:operatingSchedule = 'HOLIDAY' AND mi.holiday_service = TRUE)
+                  )
+              AND (
+                    :openNowOnly = FALSE
+                    OR (
                         :includeEmergencyRooms = TRUE
-                        AND :includeHospitals = FALSE
-                        AND :includePharmacies = FALSE
                         AND mi.emergency_room_available = TRUE
                     )
                     OR (
@@ -65,28 +113,6 @@ public interface MedicalInstitutionRepository extends JpaRepository<MedicalInsti
                                 AND (:currentTime >= oh.open_time OR :currentTime < oh.close_time))
                         )
                     )
-                  )
-              AND (
-                    :departmentCode IS NULL
-                    OR (
-                        :departmentCode = 'KOREAN_CLINIC'
-                        AND mi.institution_kind_name IN ('한의원', '한방병원')
-                    )
-                    OR (
-                        :departmentCode <> 'KOREAN_CLINIC'
-                        AND LOCATE(
-                            CONCAT('|', :departmentCode, '|'),
-                            CONCAT('|', COALESCE(mi.department_codes, ''), '|')
-                        ) > 0
-                    )
-                  )
-              AND (
-                    :operatingSchedule = 'ALL'
-                    OR (:operatingSchedule = 'NIGHT' AND mi.night_service = TRUE)
-                    OR (:operatingSchedule = 'TWENTY_FOUR_HOURS' AND mi.twenty_four_hours = TRUE)
-                    OR (:operatingSchedule = 'SATURDAY' AND mi.saturday_service = TRUE)
-                    OR (:operatingSchedule = 'SUNDAY' AND mi.sunday_service = TRUE)
-                    OR (:operatingSchedule = 'HOLIDAY' AND mi.holiday_service = TRUE)
                   )
               AND mi.latitude BETWEEN
                     :lat - (:radiusMeters / 111320.0)
@@ -113,10 +139,33 @@ public interface MedicalInstitutionRepository extends JpaRepository<MedicalInsti
                     OR (:includeEmergencyRooms = TRUE AND mi.emergency_room_available = TRUE)
                   )
               AND (
-                    (
+                    :departmentCode IS NULL
+                    OR (
+                        :departmentCode = 'KOREAN_CLINIC'
+                        AND mi.institution_kind_name IN ('한의원', '한방병원')
+                    )
+                    OR (
+                        :departmentCode <> 'KOREAN_CLINIC'
+                        AND EXISTS (
+                            SELECT 1
+                            FROM medical_institution_departments department_filter
+                            WHERE department_filter.institution_id = mi.id
+                              AND department_filter.department_code = :departmentCode
+                        )
+                    )
+                  )
+              AND (
+                    :operatingSchedule = 'ALL'
+                    OR (:operatingSchedule = 'NIGHT' AND mi.night_service = TRUE)
+                    OR (:operatingSchedule = 'TWENTY_FOUR_HOURS' AND mi.twenty_four_hours = TRUE)
+                    OR (:operatingSchedule = 'SATURDAY' AND mi.saturday_service = TRUE)
+                    OR (:operatingSchedule = 'SUNDAY' AND mi.sunday_service = TRUE)
+                    OR (:operatingSchedule = 'HOLIDAY' AND mi.holiday_service = TRUE)
+                  )
+              AND (
+                    :openNowOnly = FALSE
+                    OR (
                         :includeEmergencyRooms = TRUE
-                        AND :includeHospitals = FALSE
-                        AND :includePharmacies = FALSE
                         AND mi.emergency_room_available = TRUE
                     )
                     OR (
@@ -130,28 +179,6 @@ public interface MedicalInstitutionRepository extends JpaRepository<MedicalInsti
                         )
                     )
                   )
-              AND (
-                    :departmentCode IS NULL
-                    OR (
-                        :departmentCode = 'KOREAN_CLINIC'
-                        AND mi.institution_kind_name IN ('한의원', '한방병원')
-                    )
-                    OR (
-                        :departmentCode <> 'KOREAN_CLINIC'
-                        AND LOCATE(
-                            CONCAT('|', :departmentCode, '|'),
-                            CONCAT('|', COALESCE(mi.department_codes, ''), '|')
-                        ) > 0
-                    )
-                  )
-              AND (
-                    :operatingSchedule = 'ALL'
-                    OR (:operatingSchedule = 'NIGHT' AND mi.night_service = TRUE)
-                    OR (:operatingSchedule = 'TWENTY_FOUR_HOURS' AND mi.twenty_four_hours = TRUE)
-                    OR (:operatingSchedule = 'SATURDAY' AND mi.saturday_service = TRUE)
-                    OR (:operatingSchedule = 'SUNDAY' AND mi.sunday_service = TRUE)
-                    OR (:operatingSchedule = 'HOLIDAY' AND mi.holiday_service = TRUE)
-                  )
               AND mi.latitude BETWEEN
                     :lat - (:radiusMeters / 111320.0)
                     AND :lat + (:radiusMeters / 111320.0)
@@ -164,7 +191,7 @@ public interface MedicalInstitutionRepository extends JpaRepository<MedicalInsti
                   ) <= :radiusMeters
             """,
             nativeQuery = true)
-    Page<NearbyInstitutionRow> findOpenNearby(
+    Page<NearbyInstitutionRow> findNearby(
             @Param("lat") double lat,
             @Param("lng") double lng,
             @Param("radiusMeters") int radiusMeters,
@@ -175,6 +202,7 @@ public interface MedicalInstitutionRepository extends JpaRepository<MedicalInsti
             @Param("currentTime") LocalTime currentTime,
             @Param("departmentCode") String departmentCode,
             @Param("operatingSchedule") String operatingSchedule,
+            @Param("openNowOnly") boolean openNowOnly,
             Pageable pageable
     );
 

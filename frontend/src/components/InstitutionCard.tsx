@@ -1,9 +1,13 @@
 import { BedDouble, ChevronRight, Clock3, Navigation, Phone, Star } from 'lucide-react';
 import { TYPE_ICONS } from '../constants/institutionIcons';
-import { TYPE_META } from '../constants/institutions';
 import { useAuthStore } from '../store/useAuthStore';
 import type { NearbyInstitution } from '../types/institution';
-import { formatDistance, formatTime, toMapUrl } from '../utils/institutionFormat';
+import {
+  formatDistance,
+  formatInstitutionType,
+  formatTime,
+  toMapUrl
+} from '../utils/institutionFormat';
 
 interface InstitutionCardProps {
   institution: NearbyInstitution;
@@ -15,18 +19,14 @@ interface InstitutionCardProps {
 
 function InstitutionCard({ institution, favorite, selected, onFavorite, onSelect }: InstitutionCardProps) {
   const user = useAuthStore((state) => state.user);
-  const meta = TYPE_META[institution.type];
   const TypeIcon = TYPE_ICONS[institution.type];
   const typeClass = institution.type.toLowerCase();
-  const typeBadgeLabel = institution.type === 'HOSPITAL'
-    ? institution.medicalDepartments.length > 0
-      ? institution.medicalDepartments.join(' · ')
-      : institution.institutionKind ?? meta.label
-    : meta.label;
+  const typeBadgeLabel = formatInstitutionType(institution);
   const hoursText = institution.todayOpenTime && institution.todayCloseTime
     ? `${formatTime(institution.todayOpenTime)} ~ ${formatTime(institution.todayCloseTime)}`
     : institution.operatingHoursKnown ? '오늘 휴무' : '정보 없음';
-  const hasEmergencyAvailability = institution.type === 'EMERGENCY_ROOM'
+  const isEmergencyRoom = institution.type === 'EMERGENCY_ROOM';
+  const hasEmergencyAvailability = isEmergencyRoom
     && institution.availableEmergencyBeds !== null;
 
   return (
@@ -45,12 +45,14 @@ function InstitutionCard({ institution, favorite, selected, onFavorite, onSelect
             && institution.institutionKind
             && institution.institutionKind !== '응급의료기관'
             && <span className="kind-badge">{institution.institutionKind}</span>}
-          {institution.operatingHoursKnown ? (
-            <span className={institution.open ? 'open-badge' : 'closed-badge'}>
-              {institution.open ? '진료 중' : '진료 종료'}
-            </span>
-          ) : (
-            <span className="unknown-hours-badge">운영시간 확인 필요</span>
+          {!isEmergencyRoom && (
+            institution.operatingHoursKnown ? (
+              <span className={institution.open ? 'open-badge' : 'closed-badge'}>
+                {institution.open ? '진료 중' : '진료 종료'}
+              </span>
+            ) : (
+              <span className="unknown-hours-badge">운영시간 확인 필요</span>
+            )
           )}
         </div>
         <p className="institution-address">{institution.roadAddress ?? '주소 정보 없음'}</p>
@@ -70,13 +72,14 @@ function InstitutionCard({ institution, favorite, selected, onFavorite, onSelect
       </div>
       <div className="hours-box">
         <span>
-          {hasEmergencyAvailability ? <BedDouble size={14} /> : <Clock3 size={14} />}
-          {hasEmergencyAvailability ? '실시간 가용 병상' : '운영시간'}
+          {isEmergencyRoom ? <BedDouble size={14} /> : <Clock3 size={14} />}
+          {isEmergencyRoom ? '실시간 가용 병상' : '운영시간'}
         </span>
         <strong className={hasEmergencyAvailability && institution.availableEmergencyBeds === 0 ? 'no-beds' : ''}>
-          {hasEmergencyAvailability ? `${institution.availableEmergencyBeds}개` : hoursText}
+          {isEmergencyRoom
+            ? hasEmergencyAvailability ? `${institution.availableEmergencyBeds}개` : '정보 없음'
+            : hoursText}
         </strong>
-        {hasEmergencyAvailability && <small>운영시간 {hoursText}</small>}
       </div>
       <div className="card-actions">
         {user && (

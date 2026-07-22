@@ -1,5 +1,7 @@
 package com.example.medicalsearch.serviceImpl;
 
+import com.example.medicalsearch.client.EmergencyBedAvailabilityClient;
+import com.example.medicalsearch.client.EmergencyBedAvailabilityClient.EmergencyInstitution;
 import com.example.medicalsearch.config.AppProperties;
 import com.example.medicalsearch.dto.NearbyInstitutionItemResponse;
 import com.example.medicalsearch.dto.NearbyInstitutionResponse;
@@ -13,6 +15,7 @@ import com.example.medicalsearch.service.InstitutionSearchService;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Map;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -24,27 +27,31 @@ public class InstitutionSearchServiceImpl implements InstitutionSearchService {
 
     private static final int DEFAULT_RADIUS_METERS = 3000;
     private static final int MAX_RADIUS_METERS = 10000;
-    private static final int MAX_PAGE_SIZE = 100;
+    private static final int MAX_PAGE_SIZE = 500;
 
     private final MedicalInstitutionRepository medicalInstitutionRepository;
     private final AppProperties appProperties;
+    private final EmergencyBedAvailabilityClient emergencyBedAvailabilityClient;
 
     public InstitutionSearchServiceImpl(
             MedicalInstitutionRepository medicalInstitutionRepository,
-            AppProperties appProperties
+            AppProperties appProperties,
+            EmergencyBedAvailabilityClient emergencyBedAvailabilityClient
     ) {
         this.medicalInstitutionRepository = medicalInstitutionRepository;
         this.appProperties = appProperties;
+        this.emergencyBedAvailabilityClient = emergencyBedAvailabilityClient;
     }
 
     @Override
-    public NearbyInstitutionResponse searchOpenNearby(
+    public NearbyInstitutionResponse searchNearby(
             double lat,
             double lng,
             Integer radiusMeters,
             List<InstitutionType> types,
             HospitalDepartment hospitalDepartment,
             OperatingScheduleFilter operatingSchedule,
+            boolean openNowOnly,
             int page,
             int size
     ) {
@@ -59,7 +66,7 @@ public class InstitutionSearchServiceImpl implements InstitutionSearchService {
                 ? departmentFilterCode(hospitalDepartment)
                 : null;
 
-        Page<NearbyInstitutionRow> nearbyPage = medicalInstitutionRepository.findOpenNearby(
+        Page<NearbyInstitutionRow> nearbyPage = medicalInstitutionRepository.findNearby(
                 lat,
                 lng,
                 normalizedRadiusMeters,
@@ -70,11 +77,21 @@ public class InstitutionSearchServiceImpl implements InstitutionSearchService {
                 requestedAt.toLocalTime(),
                 departmentCode,
                 operatingSchedule.name(),
+                openNowOnly,
                 PageRequest.of(page, normalizedSize)
         );
 
+        Map<String, Integer> availableEmergencyBeds = emergencyBedAvailabilityClient
+                .fetchAvailableBeds(nearbyPage.getContent().stream()
+                        .filter(row -> InstitutionType.EMERGENCY_ROOM.name().equals(row.getType()))
+                        .filter(row -> row.getHpid() != null)
+                        .map(row -> new EmergencyInstitution(row.getHpid(), row.getRoadAddress()))
+                        .toList());
         List<NearbyInstitutionItemResponse> items = nearbyPage.getContent().stream()
-                .map(NearbyInstitutionItemResponse::from)
+                .map(row -> NearbyInstitutionItemResponse.from(
+                        row,
+                        availableEmergencyBeds.get(row.getHpid())
+                ))
                 .toList();
         LocalDateTime lastSyncedAt = medicalInstitutionRepository.findLatestSyncedAt().orElse(null);
 
@@ -106,7 +123,11 @@ public class InstitutionSearchServiceImpl implements InstitutionSearchService {
 
     private List<InstitutionType> normalizeTypes(List<InstitutionType> types) {
         if (types == null || types.isEmpty()) {
-            return List.of(InstitutionType.HOSPITAL, InstitutionType.PHARMACY);
+            return List.of(
+                    InstitutionType.HOSPITAL,
+                    InstitutionType.PHARMACY,
+                    InstitutionType.EMERGENCY_ROOM
+            );
         }
         return types.stream().distinct().toList();
     }

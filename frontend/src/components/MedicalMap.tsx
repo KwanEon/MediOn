@@ -4,23 +4,23 @@ import { divIcon } from 'leaflet';
 import type { DivIcon, Marker as LeafletMarker } from 'leaflet';
 import { MapContainer, Marker, Popup, TileLayer, ZoomControl, useMap } from 'react-leaflet';
 import { TYPE_ICONS } from '../constants/institutionIcons';
-import { TYPE_META } from '../constants/institutions';
 import type {
   Coordinates,
   InstitutionId,
   InstitutionType,
   NearbyInstitution
 } from '../types/institution';
-import { formatDistance, formatTime } from '../utils/institutionFormat';
+import { formatDistance, formatInstitutionType, formatTime } from '../utils/institutionFormat';
 
 interface MedicalMapProps {
   location: Coordinates;
+  locationLabel: string;
   institutions: NearbyInstitution[];
   selectedId: InstitutionId | null;
   onSelect: (id: InstitutionId) => void;
 }
 
-function MedicalMap({ location, institutions, selectedId, onSelect }: MedicalMapProps) {
+function MedicalMap({ location, locationLabel, institutions, selectedId, onSelect }: MedicalMapProps) {
   const selectedInstitution = institutions.find((institution) => institution.id === selectedId) ?? null;
 
   return (
@@ -33,7 +33,7 @@ function MedicalMap({ location, institutions, selectedId, onSelect }: MedicalMap
         <ZoomControl position="bottomright" />
         <MapViewport center={location} selectedInstitution={selectedInstitution} />
         <Marker position={[location.lat, location.lng]} icon={currentLocationIcon()}>
-          <Popup>현재 위치</Popup>
+          <Popup>{locationLabel}</Popup>
         </Marker>
         {institutions.map((institution) => (
           <InstitutionMarker
@@ -56,9 +56,7 @@ interface InstitutionMarkerProps {
 
 function InstitutionMarker({ institution, selected, onSelect }: InstitutionMarkerProps) {
   const markerRef = useRef<LeafletMarker | null>(null);
-  const institutionKind = institution.type === 'HOSPITAL' && institution.institutionKind
-    ? institution.institutionKind
-    : TYPE_META[institution.type].label;
+  const institutionKind = formatInstitutionType(institution);
   const operatingStatus = institution.operatingHoursKnown
     ? institution.open ? '진료 중' : '진료 종료'
     : '운영 여부 확인 필요';
@@ -87,14 +85,28 @@ function InstitutionMarker({ institution, selected, onSelect }: InstitutionMarke
               <dt>진료 종류</dt>
               <dd title={institutionKind}>{institutionKind}</dd>
             </div>
-            <div>
-              <dt>진료 상태</dt>
-              <dd className={institution.open ? 'is-open' : ''}>{operatingStatus}</dd>
-            </div>
-            <div>
-              <dt>운영시간</dt>
-              <dd>{operatingHours}</dd>
-            </div>
+            {institution.type !== 'EMERGENCY_ROOM' && (
+              <div>
+                <dt>진료 상태</dt>
+                <dd className={institution.open ? 'is-open' : ''}>{operatingStatus}</dd>
+              </div>
+            )}
+            {institution.type === 'EMERGENCY_ROOM' && (
+              <div>
+                <dt>가용 병상</dt>
+                <dd className={institution.availableEmergencyBeds === 0 ? 'is-no-beds' : ''}>
+                  {institution.availableEmergencyBeds !== null
+                    ? `${institution.availableEmergencyBeds}개`
+                    : '정보 없음'}
+                </dd>
+              </div>
+            )}
+            {institution.type !== 'EMERGENCY_ROOM' && (
+              <div>
+                <dt>운영시간</dt>
+                <dd>{operatingHours}</dd>
+              </div>
+            )}
             <div>
               <dt>거리</dt>
               <dd>{formatDistance(institution.distanceMeters)}</dd>

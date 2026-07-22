@@ -2,11 +2,13 @@ package com.example.medicalsearch.serviceImpl;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.example.medicalsearch.client.EmergencyBedAvailabilityClient;
 import com.example.medicalsearch.config.AppProperties;
 import com.example.medicalsearch.dto.NearbyInstitutionResponse;
 import com.example.medicalsearch.entity.HospitalDepartment;
@@ -20,6 +22,7 @@ import java.time.Duration;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,11 +41,18 @@ class InstitutionSearchServiceImplTest {
     @Mock
     private NearbyInstitutionRow row;
 
+    @Mock
+    private EmergencyBedAvailabilityClient emergencyBedAvailabilityClient;
+
     private InstitutionSearchServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new InstitutionSearchServiceImpl(repository, appProperties());
+        service = new InstitutionSearchServiceImpl(
+                repository,
+                appProperties(),
+                emergencyBedAvailabilityClient
+        );
     }
 
     @Test
@@ -58,7 +68,8 @@ class InstitutionSearchServiceImplTest {
         when(row.getTodayOpenTime()).thenReturn(LocalTime.of(9, 0));
         when(row.getTodayCloseTime()).thenReturn(LocalTime.of(22, 0));
         when(row.getNightService()).thenReturn(true);
-        when(repository.findOpenNearby(
+        when(emergencyBedAvailabilityClient.fetchAvailableBeds(anyList())).thenReturn(Map.of());
+        when(repository.findNearby(
                 eq(37.5),
                 eq(127.0),
                 eq(3000),
@@ -69,17 +80,19 @@ class InstitutionSearchServiceImplTest {
                 any(LocalTime.class),
                 eq("D001"),
                 eq("NIGHT"),
+                eq(true),
                 eq(PageRequest.of(0, 20))
         )).thenReturn(new PageImpl<>(List.of(row), PageRequest.of(0, 20), 1));
         when(repository.findLatestSyncedAt()).thenReturn(Optional.empty());
 
-        NearbyInstitutionResponse response = service.searchOpenNearby(
+        NearbyInstitutionResponse response = service.searchNearby(
                 37.5,
                 127.0,
                 3000,
                 List.of(InstitutionType.HOSPITAL),
                 HospitalDepartment.INTERNAL_MEDICINE,
                 OperatingScheduleFilter.NIGHT,
+                true,
                 0,
                 20
         );
@@ -89,7 +102,7 @@ class InstitutionSearchServiceImplTest {
                 .containsExactlyInAnyOrder("내과", "피부과");
         assertThat(response.items().get(0).operatingSchedules())
                 .contains(OperatingScheduleFilter.NIGHT);
-        verify(repository).findOpenNearby(
+        verify(repository).findNearby(
                 eq(37.5),
                 eq(127.0),
                 eq(3000),
@@ -100,6 +113,7 @@ class InstitutionSearchServiceImplTest {
                 any(LocalTime.class),
                 eq("D001"),
                 eq("NIGHT"),
+                eq(true),
                 eq(PageRequest.of(0, 20))
         );
     }
@@ -112,6 +126,7 @@ class InstitutionSearchServiceImplTest {
                 new AppProperties.PublicData(
                         false,
                         "",
+                        unusedUrl,
                         unusedUrl,
                         unusedUrl,
                         unusedUrl,

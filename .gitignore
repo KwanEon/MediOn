@@ -4,6 +4,7 @@ out/
 
 backend/.gradle/
 backend/build/
+backend/bin/
 
 frontend/node_modules/
 frontend/dist/
@@ -16,3 +17,4 @@ frontend/.vite/
 *.log
 .env
 .env.*
+!.env.example

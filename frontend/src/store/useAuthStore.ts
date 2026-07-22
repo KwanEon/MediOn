@@ -3,7 +3,8 @@ import {
   fetchCurrentUser,
   login as loginRequest,
   logout as logoutRequest,
-  register as registerRequest
+  register as registerRequest,
+  updateAddress as updateAddressRequest
 } from '../api/auth';
 import type { AuthUser, LoginRequest, RegisterRequest } from '../types/auth';
 
@@ -18,6 +19,7 @@ interface AuthActions {
   loadCurrentUser: () => Promise<AuthUser | null>;
   login: (request: LoginRequest) => Promise<AuthUser>;
   register: (request: RegisterRequest) => Promise<AuthUser>;
+  updateAddress: (address: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
   clearError: () => void;
 }
@@ -77,6 +79,20 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       return await registerRequest(request);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : '회원가입을 완료하지 못했습니다.';
+      set({ error: message });
+      throw error;
+    } finally {
+      set({ loading: false });
+    }
+  },
+  updateAddress: async (address) => {
+    set({ loading: true, error: '' });
+    try {
+      const user = await updateAddressRequest({ address });
+      set({ user });
+      return user;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '주소를 변경하지 못했습니다.';
       set({ error: message });
       throw error;
     } finally {

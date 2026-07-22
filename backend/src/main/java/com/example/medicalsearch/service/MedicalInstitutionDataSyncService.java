@@ -3,6 +3,7 @@ package com.example.medicalsearch.service;
 import com.example.medicalsearch.client.NationalMedicalCenterFullDataClient;
 import com.example.medicalsearch.client.NationalMedicalCenterFullDataClient.DepartmentPage;
 import com.example.medicalsearch.client.NationalMedicalCenterFullDataClient.FullDataPage;
+import com.example.medicalsearch.client.PublicDataRateLimitException;
 import com.example.medicalsearch.config.AppProperties;
 import com.example.medicalsearch.entity.DataSyncStatus;
 import com.example.medicalsearch.entity.HospitalDepartment;
@@ -44,6 +45,7 @@ public class MedicalInstitutionDataSyncService {
     @EventListener(ApplicationReadyEvent.class)
     public void synchronizeOnStartup() {
         if (!fullDataClient.isEnabled()) {
+            log.info("PUBLIC_DATA_ENABLED=false여서 병·의원 FullData 동기화를 건너뜁니다.");
             return;
         }
         boolean databaseEmpty = syncWriter.isMedicalInstitutionTableEmpty();
@@ -52,7 +54,8 @@ public class MedicalInstitutionDataSyncService {
             return;
         }
         LocalDate today = LocalDate.now(appProperties.timeZone());
-        if (!initialSyncIncomplete && syncWriter.hasSuccessfulSyncSince(today.atStartOfDay())) {
+        if (!initialSyncIncomplete
+                && syncWriter.hasHospitalSyncAttemptSince(today.atStartOfDay())) {
             return;
         }
         if (databaseEmpty) {
@@ -69,7 +72,7 @@ public class MedicalInstitutionDataSyncService {
     )
     public void synchronize() {
         if (!fullDataClient.isEnabled()) {
-            log.warn("공공데이터 서비스 키가 없어 병·의원 FullData 동기화를 건너뜁니다.");
+            log.info("PUBLIC_DATA_ENABLED=false여서 병·의원 FullData 동기화를 건너뜁니다.");
             return;
         }
         if (!synchronizationRunning.compareAndSet(false, true)) {
@@ -81,24 +84,43 @@ public class MedicalInstitutionDataSyncService {
         LocalDateTime startedAt = LocalDateTime.now(appProperties.timeZone());
         try {
             int institutionCount = synchronizeFullData(syncRunId, startedAt);
-            int departmentRelationCount = synchronizeDepartments(syncRunId, startedAt);
             int inactiveCount = syncWriter.deactivateMissingHospitals(syncRunId, startedAt);
+            String baseMessage = "기관 upsert=" + institutionCount
+                    + ", 미수신 기관 비활성화=" + inactiveCount;
+            syncWriter.recordHospitalBaseHistory(startedAt, baseMessage);
+
+            int departmentRelationCount;
+            try {
+                departmentRelationCount = synchronizeDepartments(syncRunId);
+            } catch (PublicDataRateLimitException exception) {
+                String message = baseMessage
+                        + ", 진료과목 동기화 보류=" + exception.getMessage();
+                recordFailure(startedAt, message);
+                log.warn(
+                        "병·의원 기본 데이터 동기화는 완료했습니다. "
+                                + "진료과목 API 요청 한도가 복구되면 다음 일일 동기화에서 재시도합니다: {}",
+                        exception.getMessage()
+                );
+                return;
+            }
+
             int staleDepartmentCount = syncWriter.deleteStaleDepartments(syncRunId);
-            int departmentCodeRefreshCount = syncWriter.refreshInstitutionDepartmentCodes();
             String message = "기관 upsert=" + institutionCount
                     + ", 진료과목 관계 upsert=" + departmentRelationCount
                     + ", 미수신 기관 비활성화=" + inactiveCount
-                    + ", 만료 진료과목 관계 삭제=" + staleDepartmentCount
-                    + ", 기관 QD 코드 반영=" + departmentCodeRefreshCount;
+                    + ", 만료 진료과목 관계 삭제=" + staleDepartmentCount;
             syncWriter.recordHistory(DataSyncStatus.SUCCESS, startedAt, message);
             log.info("병·의원 FullData 동기화 완료: {}", message);
+        } catch (PublicDataRateLimitException exception) {
+            String message = "공공데이터 요청 한도 초과: " + exception.getMessage();
+            recordFailure(startedAt, message);
+            log.warn(
+                    "병·의원 FullData API 요청 한도가 복구되면 다음 일일 동기화에서 재시도합니다: {}",
+                    exception.getMessage()
+            );
         } catch (RuntimeException exception) {
             String message = "동기화 실패: " + exception.getMessage();
-            try {
-                syncWriter.recordHistory(DataSyncStatus.FAILED, startedAt, message);
-            } catch (RuntimeException historyException) {
-                log.error("동기화 실패 이력 저장에도 실패했습니다: {}", historyException.getMessage());
-            }
+            recordFailure(startedAt, message);
             log.error("병·의원 FullData 동기화 실패. 기존 활성 상태는 유지합니다.", exception);
         } finally {
             synchronizationRunning.set(false);
@@ -154,13 +176,13 @@ public class MedicalInstitutionDataSyncService {
         return receivedHpids.size();
     }
 
-    private int synchronizeDepartments(String syncRunId, LocalDateTime syncedAt) {
+    private int synchronizeDepartments(String syncRunId) {
         int relationCount = 0;
         for (HospitalDepartment department : HospitalDepartment.values()) {
             if (department.getPublicDataCode() == null) {
                 continue;
             }
-            int departmentRelationCount = synchronizeDepartment(department, syncRunId, syncedAt);
+            int departmentRelationCount = synchronizeDepartment(department, syncRunId);
             relationCount += departmentRelationCount;
             log.info(
                     "진료과목 동기화 완료: code={}, name={}, 관계={}",
@@ -174,8 +196,7 @@ public class MedicalInstitutionDataSyncService {
 
     private int synchronizeDepartment(
             HospitalDepartment department,
-            String syncRunId,
-            LocalDateTime syncedAt
+            String syncRunId
     ) {
         int pageNumber = 1;
         int expectedTotalCount = -1;
@@ -202,8 +223,7 @@ public class MedicalInstitutionDataSyncService {
             syncWriter.upsertDepartments(
                     department.getPublicDataCode(),
                     page.hpids(),
-                    syncRunId,
-                    syncedAt
+                    syncRunId
             );
             receivedHpids.addAll(page.hpids());
             if (receivedHpids.size() > expectedTotalCount) {
@@ -224,5 +244,13 @@ public class MedicalInstitutionDataSyncService {
     private int expectedPageCount(int totalCount) {
         int pageSize = Math.max(1, appProperties.publicData().syncPageSize());
         return Math.max(1, (int) Math.ceil((double) totalCount / pageSize));
+    }
+
+    private void recordFailure(LocalDateTime startedAt, String message) {
+        try {
+            syncWriter.recordHistory(DataSyncStatus.FAILED, startedAt, message);
+        } catch (RuntimeException historyException) {
+            log.error("동기화 실패 이력 저장에도 실패했습니다: {}", historyException.getMessage());
+        }
     }
 }
