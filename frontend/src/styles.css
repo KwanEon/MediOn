@@ -740,7 +740,6 @@ p {
   padding: 20px;
   place-items: center;
   background: rgba(20, 31, 48, 0.5);
-  backdrop-filter: blur(3px);
 }
 
 .confirmation-modal,

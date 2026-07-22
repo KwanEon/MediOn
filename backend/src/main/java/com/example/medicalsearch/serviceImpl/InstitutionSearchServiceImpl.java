@@ -3,6 +3,7 @@ package com.example.medicalsearch.serviceImpl;
 import com.example.medicalsearch.client.EmergencyBedAvailabilityClient;
 import com.example.medicalsearch.client.EmergencyBedAvailabilityClient.EmergencyInstitution;
 import com.example.medicalsearch.config.AppProperties;
+import com.example.medicalsearch.dto.EmergencyBedAvailabilityResponse;
 import com.example.medicalsearch.dto.NearbyInstitutionItemResponse;
 import com.example.medicalsearch.dto.NearbyInstitutionResponse;
 import com.example.medicalsearch.dto.PageResponse;
@@ -14,6 +15,7 @@ import com.example.medicalsearch.repository.NearbyInstitutionRow;
 import com.example.medicalsearch.service.InstitutionSearchService;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.data.domain.Page;
@@ -81,17 +83,8 @@ public class InstitutionSearchServiceImpl implements InstitutionSearchService {
                 PageRequest.of(page, normalizedSize)
         );
 
-        Map<String, Integer> availableEmergencyBeds = emergencyBedAvailabilityClient
-                .fetchAvailableBeds(nearbyPage.getContent().stream()
-                        .filter(row -> InstitutionType.EMERGENCY_ROOM.name().equals(row.getType()))
-                        .filter(row -> row.getHpid() != null)
-                        .map(row -> new EmergencyInstitution(row.getHpid(), row.getRoadAddress()))
-                        .toList());
         List<NearbyInstitutionItemResponse> items = nearbyPage.getContent().stream()
-                .map(row -> NearbyInstitutionItemResponse.from(
-                        row,
-                        availableEmergencyBeds.get(row.getHpid())
-                ))
+                .map(row -> NearbyInstitutionItemResponse.from(row, null))
                 .toList();
         LocalDateTime lastSyncedAt = medicalInstitutionRepository.findLatestSyncedAt().orElse(null);
 
@@ -102,6 +95,38 @@ public class InstitutionSearchServiceImpl implements InstitutionSearchService {
                 items,
                 PageResponse.of(page, normalizedSize, nearbyPage.getTotalElements())
         );
+    }
+
+    @Override
+    public EmergencyBedAvailabilityResponse getEmergencyBedAvailability(List<Long> institutionIds) {
+        List<Long> normalizedInstitutionIds = institutionIds.stream()
+                .distinct()
+                .toList();
+        if (normalizedInstitutionIds.isEmpty()) {
+            return new EmergencyBedAvailabilityResponse(Map.of());
+        }
+        if (normalizedInstitutionIds.size() > MAX_PAGE_SIZE) {
+            throw new IllegalArgumentException(
+                    "institutionIds must contain at most " + MAX_PAGE_SIZE + " values."
+            );
+        }
+
+        var emergencyInstitutions = medicalInstitutionRepository
+                .findActiveEmergencyInstitutionsByIdIn(normalizedInstitutionIds);
+        Map<String, Integer> availableBedsByHpid = emergencyBedAvailabilityClient
+                .fetchAvailableBeds(emergencyInstitutions.stream()
+                        .filter(row -> row.getHpid() != null)
+                        .map(row -> new EmergencyInstitution(row.getHpid(), row.getRoadAddress()))
+                        .toList());
+
+        Map<Long, Integer> availableBedsByInstitutionId = new LinkedHashMap<>();
+        for (var institution : emergencyInstitutions) {
+            Integer availableBeds = availableBedsByHpid.get(institution.getHpid());
+            if (availableBeds != null) {
+                availableBedsByInstitutionId.put(institution.getId(), availableBeds);
+            }
+        }
+        return new EmergencyBedAvailabilityResponse(Map.copyOf(availableBedsByInstitutionId));
     }
 
     private int normalizeRadius(Integer radiusMeters) {

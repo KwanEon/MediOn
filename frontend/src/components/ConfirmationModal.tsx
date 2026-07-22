@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertCircle, X } from 'lucide-react';
 
 interface ConfirmationModalProps {
@@ -48,7 +49,7 @@ function ConfirmationModal({
     return null;
   }
 
-  return (
+  return createPortal(
     <div
       className="modal-backdrop"
       role="presentation"
@@ -86,7 +87,8 @@ function ConfirmationModal({
           </button>
         </div>
       </section>
-    </div>
+    </div>,
+    document.body
   );
 }
 

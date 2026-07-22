@@ -39,6 +39,7 @@ public class EmergencyBedAvailabilityClient {
     private final AppProperties.PublicData properties;
     private final HttpClient httpClient;
     private final Map<Region, CachedAvailability> regionCache = new ConcurrentHashMap<>();
+    private final Map<Region, Object> regionLocks = new ConcurrentHashMap<>();
 
     public EmergencyBedAvailabilityClient(AppProperties appProperties) {
         this.properties = appProperties.publicData();
@@ -78,6 +79,12 @@ public class EmergencyBedAvailabilityClient {
     }
 
     private Map<String, Integer> getRegionAvailability(Region region) {
+        synchronized (regionLocks.computeIfAbsent(region, ignored -> new Object())) {
+            return getRegionAvailabilityLocked(region);
+        }
+    }
+
+    private Map<String, Integer> getRegionAvailabilityLocked(Region region) {
         long now = System.nanoTime();
         CachedAvailability cached = regionCache.get(region);
         if (cached != null && cached.expiresAtNanos() > now) {

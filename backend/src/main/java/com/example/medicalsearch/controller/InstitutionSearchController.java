@@ -1,15 +1,20 @@
 package com.example.medicalsearch.controller;
 
+import com.example.medicalsearch.dto.EmergencyBedAvailabilityRequest;
+import com.example.medicalsearch.dto.EmergencyBedAvailabilityResponse;
 import com.example.medicalsearch.dto.NearbyInstitutionResponse;
 import com.example.medicalsearch.entity.HospitalDepartment;
 import com.example.medicalsearch.entity.InstitutionType;
 import com.example.medicalsearch.entity.OperatingScheduleFilter;
 import com.example.medicalsearch.service.InstitutionSearchService;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.util.List;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -48,5 +53,12 @@ public class InstitutionSearchController {
                 page,
                 size
         );
+    }
+
+    @PostMapping("/emergency-beds")
+    public EmergencyBedAvailabilityResponse getEmergencyBedAvailability(
+            @Valid @RequestBody EmergencyBedAvailabilityRequest request
+    ) {
+        return institutionSearchService.getEmergencyBedAvailability(request.institutionIds());
     }
 }

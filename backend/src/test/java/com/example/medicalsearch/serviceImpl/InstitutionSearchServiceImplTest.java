@@ -2,7 +2,6 @@ package com.example.medicalsearch.serviceImpl;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -22,7 +21,6 @@ import java.time.Duration;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -68,7 +66,6 @@ class InstitutionSearchServiceImplTest {
         when(row.getTodayOpenTime()).thenReturn(LocalTime.of(9, 0));
         when(row.getTodayCloseTime()).thenReturn(LocalTime.of(22, 0));
         when(row.getNightService()).thenReturn(true);
-        when(emergencyBedAvailabilityClient.fetchAvailableBeds(anyList())).thenReturn(Map.of());
         when(repository.findNearby(
                 eq(37.5),
                 eq(127.0),

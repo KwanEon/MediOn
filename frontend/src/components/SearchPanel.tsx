@@ -7,7 +7,8 @@ import type { AddressSearchResult } from '../types/auth';
 import AddressSearchModal from './AddressSearchModal';
 
 function SearchPanel() {
-  const userId = useAuthStore((state) => state.user?.id ?? null);
+  const user = useAuthStore((state) => state.user);
+  const userId = user?.id ?? null;
   const keyword = useMedicalSearchStore((state) => state.keyword);
   const locationLabel = useMedicalSearchStore((state) => state.locationLabel);
   const locating = useMedicalSearchStore((state) => state.locating);
@@ -16,6 +17,7 @@ function SearchPanel() {
   const clearSearch = useMedicalSearchStore((state) => state.clearSearch);
   const requestCurrentLocation = useMedicalSearchStore((state) => state.requestCurrentLocation);
   const setAddressLocation = useMedicalSearchStore((state) => state.setAddressLocation);
+  const setAccountLocation = useMedicalSearchStore((state) => state.setAccountLocation);
   const [addressModalOpen, setAddressModalOpen] = useState(false);
 
   const closeAddressModal = useCallback(() => setAddressModalOpen(false), []);
@@ -31,6 +33,19 @@ function SearchPanel() {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     submitSearch();
+  }
+
+  function handleLocationSearch() {
+    if (user) {
+      setAccountLocation(
+        user.id,
+        { lat: user.latitude, lng: user.longitude },
+        user.address,
+        true
+      );
+      return;
+    }
+    requestCurrentLocation();
   }
 
   return (
@@ -60,7 +75,7 @@ function SearchPanel() {
             <span>검색</span>
           </button>
         </div>
-        <button className="location-search-button" type="button" onClick={requestCurrentLocation} disabled={locating}>
+        <button className="location-search-button" type="button" onClick={handleLocationSearch} disabled={locating}>
           {locating ? <RefreshCw className="spin" size={19} /> : <LocateFixed size={19} />}
           {locating ? '위치 확인 중' : '내 위치로 찾기'}
         </button>

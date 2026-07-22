@@ -3,6 +3,8 @@ package com.example.medicalsearch.repository;
 import com.example.medicalsearch.entity.MedicalInstitution;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -208,4 +210,18 @@ public interface MedicalInstitutionRepository extends JpaRepository<MedicalInsti
 
     @Query("select max(m.lastSyncedAt) from MedicalInstitution m where m.active = true")
     Optional<LocalDateTime> findLatestSyncedAt();
+
+    @Query("""
+            select
+                m.id as id,
+                m.hpid as hpid,
+                m.roadAddress as roadAddress
+            from MedicalInstitution m
+            where m.id in :institutionIds
+              and m.active = true
+              and m.emergencyRoomAvailable = true
+            """)
+    List<EmergencyInstitutionRow> findActiveEmergencyInstitutionsByIdIn(
+            @Param("institutionIds") Collection<Long> institutionIds
+    );
 }

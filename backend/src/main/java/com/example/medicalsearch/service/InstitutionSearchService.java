@@ -1,5 +1,6 @@
 package com.example.medicalsearch.service;
 
+import com.example.medicalsearch.dto.EmergencyBedAvailabilityResponse;
 import com.example.medicalsearch.dto.NearbyInstitutionResponse;
 import com.example.medicalsearch.entity.HospitalDepartment;
 import com.example.medicalsearch.entity.InstitutionType;
@@ -19,4 +20,6 @@ public interface InstitutionSearchService {
             int page,
             int size
     );
+
+    EmergencyBedAvailabilityResponse getEmergencyBedAvailability(List<Long> institutionIds);
 }

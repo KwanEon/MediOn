@@ -21,6 +21,7 @@ function HomePage({ initialCategory = 'ALL' }: HomePageProps) {
   const locating = useMedicalSearchStore((state) => state.locating);
   const locationReady = useMedicalSearchStore((state) => state.locationReady);
   const locationAttempted = useMedicalSearchStore((state) => state.locationAttempted);
+  const searchRevision = useMedicalSearchStore((state) => state.searchRevision);
   const selectedCategory = useMedicalSearchStore((state) => state.selectedCategory);
   const selectedHospitalDepartment = useMedicalSearchStore(
     (state) => state.selectedHospitalDepartment
@@ -105,7 +106,8 @@ function HomePage({ initialCategory = 'ALL' }: HomePageProps) {
     selectedHospitalDepartment,
     operatingSchedule,
     openNowOnly,
-    resultSize
+    resultSize,
+    searchRevision
   ]);
 
   return (

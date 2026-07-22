@@ -85,6 +85,10 @@ export interface NearbyInstitutionResponse {
   page: PageResponse;
 }
 
+export interface EmergencyBedAvailabilityResponse {
+  availableBeds: Record<string, number>;
+}
+
 export interface NearbyInstitutionSearchParams extends Coordinates {
   radiusMeters?: number;
   types?: readonly InstitutionType[];
