@@ -44,7 +44,7 @@ function LoginPage() {
 
   return (
     <main className="auth-page">
-      <div className="auth-brand"><Brand /></div>
+      <div className="auth-brand"><Brand showTagline={false} /></div>
       <section className="auth-card" aria-labelledby="login-title">
         <div className="auth-heading">
           <span><LogIn size={22} /></span>

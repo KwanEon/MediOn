@@ -9,9 +9,6 @@
     </Appenders>
 
     <Loggers>
-        <Logger
-                name="com.example.medicalsearch.service.MedicalInstitutionDataSyncService"
-                level="info"/>
         <Root level="info">
             <AppenderRef ref="Console"/>
         </Root>

@@ -1,4 +1,10 @@
-import type { AddressSearchResult, AuthUser, LoginRequest, RegisterRequest } from '../types/auth';
+import type {
+  AddressSearchResult,
+  AuthUser,
+  LoginRequest,
+  RegisterRequest,
+  UpdateAddressRequest
+} from '../types/auth';
 
 interface ApiErrorResponse {
   message?: string;
@@ -21,6 +27,10 @@ export async function register(request: RegisterRequest): Promise<AuthUser> {
   return requestJson<AuthUser>('/api/v1/auth/register', request);
 }
 
+export async function updateAddress(request: UpdateAddressRequest): Promise<AuthUser> {
+  return requestJson<AuthUser>('/api/v1/auth/me/address', request, 'PATCH');
+}
+
 export async function logout(): Promise<void> {
   const response = await fetch('/api/v1/auth/logout', {
     method: 'POST',
@@ -39,9 +49,9 @@ export async function searchAddresses(query: string): Promise<AddressSearchResul
   return parseResponse<AddressSearchResult[]>(response);
 }
 
-async function requestJson<T>(url: string, body: unknown): Promise<T> {
+async function requestJson<T>(url: string, body: unknown, method = 'POST'): Promise<T> {
   const response = await fetch(url, {
-    method: 'POST',
+    method,
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)

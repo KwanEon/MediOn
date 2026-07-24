@@ -4,6 +4,7 @@ import com.example.medicalsearch.dto.AuthUserResponse;
 import com.example.medicalsearch.dto.AddressSearchItemResponse;
 import com.example.medicalsearch.dto.LoginRequest;
 import com.example.medicalsearch.dto.RegisterRequest;
+import com.example.medicalsearch.dto.UpdateAddressRequest;
 import com.example.medicalsearch.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -19,6 +20,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -73,6 +75,14 @@ public class AuthController {
     @GetMapping("/me")
     AuthUserResponse me(Authentication authentication) {
         return authService.getUser(authentication.getName());
+    }
+
+    @PatchMapping("/me/address")
+    AuthUserResponse updateAddress(
+            Authentication authentication,
+            @Valid @RequestBody UpdateAddressRequest request
+    ) {
+        return authService.updateAddress(authentication.getName(), request);
     }
 
     @GetMapping("/addresses")

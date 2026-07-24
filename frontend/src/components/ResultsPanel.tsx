@@ -4,22 +4,21 @@ import { useMedicalSearchStore } from '../store/useMedicalSearchStore';
 import type { InstitutionType, NearbyInstitution } from '../types/institution';
 
 interface ResultsPanelProps {
-  institutions: NearbyInstitution[];
   visibleInstitutions: NearbyInstitution[];
 }
 
-function ResultsPanel({ institutions, visibleInstitutions }: ResultsPanelProps) {
-  const radiusMeters = useMedicalSearchStore((state) => state.radiusMeters);
+function ResultsPanel({ visibleInstitutions }: ResultsPanelProps) {
   const favorites = useMedicalSearchStore((state) => state.favorites);
   const selectedId = useMedicalSearchStore((state) => state.selectedId);
   const loading = useMedicalSearchStore((state) => state.loading);
   const toggleFavorite = useMedicalSearchStore((state) => state.toggleFavorite);
   const setSelectedId = useMedicalSearchStore((state) => state.setSelectedId);
 
+  const displayedInstitutions = loading ? [] : visibleInstitutions;
   const counts: Record<InstitutionType, number> = {
-    HOSPITAL: institutions.filter((item) => item.type === 'HOSPITAL').length,
-    PHARMACY: institutions.filter((item) => item.type === 'PHARMACY').length,
-    EMERGENCY_ROOM: institutions.filter((item) => item.type === 'EMERGENCY_ROOM').length
+    HOSPITAL: displayedInstitutions.filter((item) => item.type === 'HOSPITAL').length,
+    PHARMACY: displayedInstitutions.filter((item) => item.type === 'PHARMACY').length,
+    EMERGENCY_ROOM: displayedInstitutions.filter((item) => item.type === 'EMERGENCY_ROOM').length
   };
 
   return (
@@ -27,7 +26,7 @@ function ResultsPanel({ institutions, visibleInstitutions }: ResultsPanelProps) 
       <div className="result-summary">
         <div className="summary-location-icon"><Navigation size={23} /></div>
         <div>
-          <p id="result-title">내 주변 {radiusMeters / 1000}km 내 의료기관</p>
+          <p id="result-title">의료기관 목록은 거리순으로 출력됩니다.</p>
           <div className="summary-counts">
             <span>병원 <b className="hospital-text">{counts.HOSPITAL}</b></span>
             <span>약국 <b className="pharmacy-text">{counts.PHARMACY}</b></span>
@@ -58,7 +57,7 @@ function ResultsPanel({ institutions, visibleInstitutions }: ResultsPanelProps) 
         </div>
         <div className="open-summary">
           <ListChecks size={22} />
-          <span>검색 결과<strong>{visibleInstitutions.length}곳 확인</strong></span>
+          <span>검색 결과<strong>{displayedInstitutions.length}곳 확인</strong></span>
         </div>
       </div>
 
@@ -70,7 +69,7 @@ function ResultsPanel({ institutions, visibleInstitutions }: ResultsPanelProps) 
           </div>
         )}
 
-        {!loading && visibleInstitutions.map((institution) => (
+        {displayedInstitutions.map((institution) => (
           <InstitutionCard
             key={institution.id}
             institution={institution}
@@ -81,7 +80,7 @@ function ResultsPanel({ institutions, visibleInstitutions }: ResultsPanelProps) 
           />
         ))}
 
-        {!loading && visibleInstitutions.length === 0 && (
+        {!loading && displayedInstitutions.length === 0 && (
           <div className="empty-state">
             <Search size={26} />
             <strong>조건에 맞는 의료기관이 없습니다.</strong>

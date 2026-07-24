@@ -58,6 +58,7 @@ export function createPreviewInstitutions(center: Coordinates): NearbyInstitutio
       todayOpenTime,
       todayCloseTime,
       availableEmergencyBeds: null,
+      emergencyBedAvailabilityLoading: false,
       operatingSchedules: [],
       lastSyncedAt: new Date().toISOString()
     };

@@ -43,7 +43,7 @@ export type HospitalDepartmentId =
   | 'PREVENTIVE_MEDICINE'
   | 'KOREAN_CLINIC';
 
-export type InstitutionId = number | string;
+export type InstitutionId = number;
 
 export interface Coordinates {
   lat: number;
@@ -66,6 +66,7 @@ export interface NearbyInstitution {
   todayOpenTime: string | null;
   todayCloseTime: string | null;
   availableEmergencyBeds: number | null;
+  emergencyBedAvailabilityLoading: boolean;
   operatingSchedules: OperatingScheduleFilter[];
   lastSyncedAt: string | null;
 }
@@ -85,11 +86,16 @@ export interface NearbyInstitutionResponse {
   page: PageResponse;
 }
 
+export interface EmergencyBedAvailabilityResponse {
+  availableBeds: Record<string, number>;
+}
+
 export interface NearbyInstitutionSearchParams extends Coordinates {
   radiusMeters?: number;
   types?: readonly InstitutionType[];
   hospitalDepartment?: Exclude<HospitalDepartmentId, 'ALL'>;
   operatingSchedule?: OperatingScheduleFilter;
+  openNowOnly?: boolean;
   page?: number;
   size?: number;
 }

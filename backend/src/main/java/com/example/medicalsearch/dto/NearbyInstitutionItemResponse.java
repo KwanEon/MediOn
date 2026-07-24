@@ -33,7 +33,10 @@ public record NearbyInstitutionItemResponse(
         LocalDateTime lastSyncedAt
 ) {
 
-    public static NearbyInstitutionItemResponse from(NearbyInstitutionRow row) {
+    public static NearbyInstitutionItemResponse from(
+            NearbyInstitutionRow row,
+            Integer availableEmergencyBeds
+    ) {
         return new NearbyInstitutionItemResponse(
                 row.getId(),
                 InstitutionType.valueOf(row.getType()),
@@ -45,11 +48,11 @@ public record NearbyInstitutionItemResponse(
                 row.getLatitude(),
                 row.getLongitude(),
                 Math.round(row.getDistanceMeters()),
-                true,
-                true,
+                isTrue(row.getOpenNow()),
+                isTrue(row.getOperatingHoursKnown()),
                 row.getTodayOpenTime(),
                 row.getTodayCloseTime(),
-                null,
+                availableEmergencyBeds,
                 operatingSchedules(row),
                 row.getLastSyncedAt()
         );
@@ -64,6 +67,10 @@ public record NearbyInstitutionItemResponse(
                 .filter(part -> !part.isEmpty())
                 .map(HospitalDepartment::officialNameFor)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private static boolean isTrue(Long value) {
+        return value != null && value == 1L;
     }
 
     private static Set<OperatingScheduleFilter> operatingSchedules(NearbyInstitutionRow row) {

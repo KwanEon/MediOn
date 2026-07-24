@@ -109,11 +109,15 @@ public class AppUser {
         return longitude;
     }
 
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
+    public void updateAddress(
+            String address,
+            BigDecimal latitude,
+            BigDecimal longitude,
+            LocalDateTime updatedAt
+    ) {
+        this.address = address;
+        this.latitude = latitude;
+        this.longitude = longitude;
+        this.updatedAt = updatedAt;
     }
 }

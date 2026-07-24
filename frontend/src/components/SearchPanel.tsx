@@ -1,8 +1,14 @@
+import { useCallback, useState } from 'react';
 import type { FormEvent } from 'react';
-import { LocateFixed, RefreshCw, Search, X } from 'lucide-react';
+import { LocateFixed, MapPinned, RefreshCw, Search, X } from 'lucide-react';
+import { useAuthStore } from '../store/useAuthStore';
 import { useMedicalSearchStore } from '../store/useMedicalSearchStore';
+import type { AddressSearchResult } from '../types/auth';
+import AddressSearchModal from './AddressSearchModal';
 
 function SearchPanel() {
+  const user = useAuthStore((state) => state.user);
+  const userId = user?.id ?? null;
   const keyword = useMedicalSearchStore((state) => state.keyword);
   const locationLabel = useMedicalSearchStore((state) => state.locationLabel);
   const locating = useMedicalSearchStore((state) => state.locating);
@@ -10,10 +16,36 @@ function SearchPanel() {
   const submitSearch = useMedicalSearchStore((state) => state.submitSearch);
   const clearSearch = useMedicalSearchStore((state) => state.clearSearch);
   const requestCurrentLocation = useMedicalSearchStore((state) => state.requestCurrentLocation);
+  const setAddressLocation = useMedicalSearchStore((state) => state.setAddressLocation);
+  const setAccountLocation = useMedicalSearchStore((state) => state.setAccountLocation);
+  const [addressModalOpen, setAddressModalOpen] = useState(false);
+
+  const closeAddressModal = useCallback(() => setAddressModalOpen(false), []);
+  const selectSearchAddress = useCallback((result: AddressSearchResult) => {
+    setAddressLocation(
+      userId,
+      { lat: result.latitude, lng: result.longitude },
+      result.address
+    );
+    setAddressModalOpen(false);
+  }, [setAddressLocation, userId]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     submitSearch();
+  }
+
+  function handleLocationSearch() {
+    if (user) {
+      setAccountLocation(
+        user.id,
+        { lat: user.latitude, lng: user.longitude },
+        user.address,
+        true
+      );
+      return;
+    }
+    requestCurrentLocation();
   }
 
   return (
@@ -21,7 +53,7 @@ function SearchPanel() {
       <div className="intro-copy">
         <p>{locationLabel}</p>
         <h1 id="page-title">주변 의료기관 찾기</h1>
-        <span>실제 주변 병원과 약국을 거리순으로 확인하세요.</span>
+        <span>우리집 주변 의료기관들을 거리순으로 확인하세요.</span>
       </div>
 
       <form className="search-controls" role="search" onSubmit={handleSubmit}>
@@ -43,11 +75,24 @@ function SearchPanel() {
             <span>검색</span>
           </button>
         </div>
-        <button className="location-search-button" type="button" onClick={requestCurrentLocation} disabled={locating}>
+        <button className="location-search-button" type="button" onClick={handleLocationSearch} disabled={locating}>
           {locating ? <RefreshCw className="spin" size={19} /> : <LocateFixed size={19} />}
           {locating ? '위치 확인 중' : '내 위치로 찾기'}
         </button>
+        <button
+          className="address-location-search-button"
+          type="button"
+          onClick={() => setAddressModalOpen(true)}
+        >
+          <MapPinned size={19} />
+          주소로 찾기
+        </button>
       </form>
+      <AddressSearchModal
+        open={addressModalOpen}
+        onClose={closeAddressModal}
+        onSelect={selectSearchAddress}
+      />
     </section>
   );
 }

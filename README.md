@@ -2,17 +2,18 @@
 
 Spring Boot + React 기반 위치 중심 의료기관 탐색 서비스입니다.
 
-## First Milestone
+## 주요 기능
 
-- 국립중앙의료원 FullData를 로컬 DB에 증분 동기화한 뒤 현재 위치 주변 병·의원 조회
-- 거리순, 이름순, 운영 종료 임박순 정렬
-- 데이터 갱신 시각 표시
-- 의료기관 선택 시 해당 위치로 지도 이동
-- React에서 현재 위치 권한 사용 후 목록 표시
+- 국립중앙의료원 FullData 기반 병원·약국·응급실 동기화
+- 현재 위치, 회원 주소 또는 검색한 주소 주변 의료기관 조회
+- 진료 중 여부, 진료과목, 운영 일정, 거리와 결과 개수 필터
+- 응급실 실시간 가용 병상 조회
+- 회원가입·로그인, 주소 변경과 의료기관 즐겨찾기
+- 목록과 지도를 연동한 의료기관 상세 정보 표시
 
 ## Tech Stack
 
-- Java 17
+- Java 21
 - Spring Boot 3.x
 - Spring Data JPA
 - MySQL 8.x
@@ -45,8 +46,10 @@ MySQL에 `medical_search` 데이터베이스를 만든 뒤 실행합니다.
 
 ```bash
 cd backend
-gradle bootRun
+./gradlew bootRun
 ```
+
+Windows에서는 `gradlew.bat bootRun`을 실행합니다.
 
 기본 DB 설정은 환경변수로 바꿀 수 있습니다.
 
@@ -56,7 +59,9 @@ DB_USERNAME=root
 DB_PASSWORD=password
 ```
 
-국립중앙의료원 병·의원 FullData는 기본적으로 매일 오전 3시에 동기화됩니다. HPID를 고유키로 `INSERT ... ON DUPLICATE KEY UPDATE`를 수행하고, 전체 동기화와 진료과목 동기화가 모두 성공한 경우에만 이번 실행에서 수신되지 않은 병·의원을 비활성화합니다. 검색 요청은 외부 API를 호출하지 않고 MySQL에 저장된 활성 기관과 진료과목, 운영시간만 조회합니다. 당일 성공 이력이 없으면 애플리케이션 시작 후 백그라운드에서 한 번 동기화합니다.
+국립중앙의료원 병원·약국 FullData는 기본적으로 매일 오전 3시에 동기화됩니다. HPID를 고유키로 `INSERT ... ON DUPLICATE KEY UPDATE`를 수행하며, 병원 전체 데이터 수신이 완료되면 미수신 기관을 비활성화하고 체크포인트를 저장합니다. 진료과목 관계는 모든 진료과목 수신이 완료된 경우에만 오래된 관계를 삭제합니다. API 요청 한도에 도달하면 기존 데이터를 유지하고 다음 일일 동기화에서 재시도합니다. 같은 날 이미 시도한 이력이 있으면 서버 재시작만으로 전체 조회를 반복하지 않습니다.
+
+일반 의료기관 검색은 외부 API를 직접 호출하지 않고 MySQL에 저장된 활성 기관, 진료과목과 운영시간을 조회합니다. 응급실 검색 결과의 가용 병상만 국립중앙의료원 실시간 API로 보완합니다.
 
 ```powershell
 $env:DATA_GO_KR_SERVICE_KEY='공공데이터포털 일반 인증키'
@@ -69,6 +74,8 @@ PUBLIC_DATA_ENABLED=true
 DATA_GO_KR_SERVICE_KEY=공공데이터포털 일반 인증키
 DATA_GO_KR_HOSPITAL_FULL_DATA_URL=https://apis.data.go.kr/B552657/HsptlAsembySearchService/getHsptlMdcncFullDown
 DATA_GO_KR_HOSPITAL_DEPARTMENT_LIST_URL=https://apis.data.go.kr/B552657/HsptlAsembySearchService/getHsptlMdcncListInfoInqire
+DATA_GO_KR_PHARMACY_FULL_DATA_URL=https://apis.data.go.kr/B552657/ErmctInsttInfoInqireService/getParmacyFullDown
+DATA_GO_KR_EMERGENCY_BED_AVAILABILITY_URL=https://apis.data.go.kr/B552657/ErmctInfoInqireService/getEmrrmRltmUsefulSckbdInfoInqire
 DATA_GO_KR_TIMEOUT=20s
 DATA_GO_KR_SYNC_PAGE_SIZE=1000
 DATA_GO_KR_SYNC_ON_STARTUP=true

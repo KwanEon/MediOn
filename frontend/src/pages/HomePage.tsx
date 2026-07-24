@@ -21,12 +21,15 @@ function HomePage({ initialCategory = 'ALL' }: HomePageProps) {
   const locating = useMedicalSearchStore((state) => state.locating);
   const locationReady = useMedicalSearchStore((state) => state.locationReady);
   const locationAttempted = useMedicalSearchStore((state) => state.locationAttempted);
+  const searchRevision = useMedicalSearchStore((state) => state.searchRevision);
   const selectedCategory = useMedicalSearchStore((state) => state.selectedCategory);
   const selectedHospitalDepartment = useMedicalSearchStore(
     (state) => state.selectedHospitalDepartment
   );
   const radiusMeters = useMedicalSearchStore((state) => state.radiusMeters);
   const operatingSchedule = useMedicalSearchStore((state) => state.operatingSchedule);
+  const openNowOnly = useMedicalSearchStore((state) => state.openNowOnly);
+  const resultSize = useMedicalSearchStore((state) => state.resultSize);
   const submittedKeyword = useMedicalSearchStore((state) => state.submittedKeyword);
   const favoritesOnly = useMedicalSearchStore((state) => state.favoritesOnly);
   const favorites = useMedicalSearchStore((state) => state.favorites);
@@ -101,7 +104,10 @@ function HomePage({ initialCategory = 'ALL' }: HomePageProps) {
     radiusMeters,
     selectedCategory,
     selectedHospitalDepartment,
-    operatingSchedule
+    operatingSchedule,
+    openNowOnly,
+    resultSize,
+    searchRevision
   ]);
 
   return (
@@ -113,6 +119,7 @@ function HomePage({ initialCategory = 'ALL' }: HomePageProps) {
         {locationReady ? (
           <MedicalMap
             location={location}
+            locationLabel={locationLabel}
             institutions={visibleInstitutions}
             selectedId={selectedId}
             onSelect={setSelectedId}
@@ -123,7 +130,7 @@ function HomePage({ initialCategory = 'ALL' }: HomePageProps) {
             <span>{locating ? '위치를 확인하면 주변 의료기관을 불러옵니다.' : '내 위치로 찾기 버튼을 눌러 주세요.'}</span>
           </div>
         )}
-        <ResultsPanel institutions={institutions} visibleInstitutions={visibleInstitutions} />
+        <ResultsPanel visibleInstitutions={visibleInstitutions} />
       </section>
     </main>
   );

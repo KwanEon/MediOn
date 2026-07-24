@@ -99,7 +99,7 @@ function RegisterPage() {
 
   return (
     <main className="auth-page register-page">
-      <div className="auth-brand"><Brand /></div>
+      <div className="auth-brand"><Brand showTagline={false} /></div>
       <section className="auth-card register-card" aria-labelledby="register-title">
         <div className="auth-heading">
           <span><ShieldCheck size={22} /></span>

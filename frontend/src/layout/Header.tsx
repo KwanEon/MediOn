@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { LogIn, LogOut, Menu, UserRound, X } from 'lucide-react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import Brand from '../components/Brand';
+import ConfirmationModal from '../components/ConfirmationModal';
 import { useAuthStore } from '../store/useAuthStore';
 import { useMedicalSearchStore } from '../store/useMedicalSearchStore';
 
@@ -26,11 +28,13 @@ function Header() {
   const setFavoritesOnly = useMedicalSearchStore((state) => state.setFavoritesOnly);
   const toggleMobileMenu = useMedicalSearchStore((state) => state.toggleMobileMenu);
   const closeMobileMenu = useMedicalSearchStore((state) => state.closeMobileMenu);
+  const [logoutModalOpen, setLogoutModalOpen] = useState(false);
 
   async function handleLogout() {
     await logout();
     setFavoritesOnly(false);
     closeMobileMenu();
+    setLogoutModalOpen(false);
     navigate('/', { replace: true });
   }
 
@@ -60,7 +64,12 @@ function Header() {
                 <UserRound size={19} />
                 <span>{user.name}</span>
               </Link>
-              <button className="header-logout-button" type="button" onClick={handleLogout} disabled={authLoading}>
+              <button
+                className="header-logout-button"
+                type="button"
+                onClick={() => setLogoutModalOpen(true)}
+                disabled={authLoading}
+              >
                 <LogOut size={18} />
                 <span>로그아웃</span>
               </button>
@@ -81,6 +90,15 @@ function Header() {
           </button>
         </div>
       </div>
+      <ConfirmationModal
+        open={logoutModalOpen}
+        title="로그아웃"
+        message="로그아웃 하시겠습니까?"
+        confirmLabel="로그아웃"
+        loading={authLoading}
+        onCancel={() => setLogoutModalOpen(false)}
+        onConfirm={() => void handleLogout()}
+      />
     </header>
   );
 }

@@ -21,6 +21,10 @@ export interface RegisterRequest extends LoginRequest {
   address: string;
 }
 
+export interface UpdateAddressRequest {
+  address: string;
+}
+
 export interface AddressSearchResult {
   address: string;
   roadAddress: string | null;

@@ -80,7 +80,6 @@ class MedicalInstitutionDataSyncServiceTest {
                 any(LocalDateTime.class)
         );
         verify(syncWriter).deleteStaleDepartments(finalizeRunId.getValue());
-        verify(syncWriter).refreshInstitutionDepartmentCodes();
         verify(syncWriter).recordHistory(
                 org.mockito.ArgumentMatchers.eq(DataSyncStatus.SUCCESS),
                 any(LocalDateTime.class),
@@ -90,7 +89,7 @@ class MedicalInstitutionDataSyncServiceTest {
     }
 
     @Test
-    void keepsExistingActiveStateWhenDepartmentSyncFails() {
+    void finalizesCompleteBaseDataButKeepsDepartmentsWhenDepartmentSyncFails() {
         when(fullDataClient.fetchFullDataPage(1))
                 .thenReturn(new FullDataPage(List.of(institution()), 1));
         when(fullDataClient.fetchDepartmentPage(anyString(), anyInt()))
@@ -98,9 +97,9 @@ class MedicalInstitutionDataSyncServiceTest {
 
         service.synchronize();
 
-        verify(syncWriter, never()).deactivateMissingHospitals(anyString(), any(LocalDateTime.class));
+        verify(syncWriter).deactivateMissingHospitals(anyString(), any(LocalDateTime.class));
+        verify(syncWriter).recordHospitalBaseHistory(any(LocalDateTime.class), anyString());
         verify(syncWriter, never()).deleteStaleDepartments(anyString());
-        verify(syncWriter, never()).refreshInstitutionDepartmentCodes();
         verify(syncWriter).recordHistory(
                 org.mockito.ArgumentMatchers.eq(DataSyncStatus.FAILED),
                 any(LocalDateTime.class),
@@ -172,6 +171,34 @@ class MedicalInstitutionDataSyncServiceTest {
     }
 
     @Test
+    void completesWhenTotalCountIncludesDuplicateHpidRows() {
+        FullDataInstitution duplicatedInstitution = institution("A0000001");
+        FullDataInstitution secondInstitution = institution("A0000002");
+        when(fullDataClient.fetchFullDataPage(1))
+                .thenReturn(new FullDataPage(
+                        List.of(duplicatedInstitution, duplicatedInstitution),
+                        3
+                ));
+        when(fullDataClient.fetchFullDataPage(2))
+                .thenReturn(new FullDataPage(List.of(secondInstitution), 3));
+        when(fullDataClient.fetchDepartmentPage(anyString(), anyInt()))
+                .thenReturn(new DepartmentPage(List.of(), 0));
+
+        service.synchronize();
+
+        verify(fullDataClient).fetchFullDataPage(2);
+        verify(fullDataClient, never()).fetchFullDataPage(3);
+        verify(syncWriter).deactivateMissingHospitals(anyString(), any(LocalDateTime.class));
+        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
+        verify(syncWriter).recordHistory(
+                org.mockito.ArgumentMatchers.eq(DataSyncStatus.SUCCESS),
+                any(LocalDateTime.class),
+                messageCaptor.capture()
+        );
+        assertThat(messageCaptor.getValue()).contains("기관 upsert=2");
+    }
+
+    @Test
     void synchronizesEveryQdCode() {
         when(fullDataClient.fetchFullDataPage(1))
                 .thenReturn(new FullDataPage(List.of(institution()), 1));
@@ -184,8 +211,7 @@ class MedicalInstitutionDataSyncServiceTest {
         verify(syncWriter, times(29)).upsertDepartments(
                 codeCaptor.capture(),
                 any(),
-                anyString(),
-                any(LocalDateTime.class)
+                anyString()
         );
         assertThat(codeCaptor.getAllValues()).containsExactly(
                 "D001", "D002", "D003", "D004", "D005", "D006", "D007", "D008",
@@ -193,7 +219,6 @@ class MedicalInstitutionDataSyncServiceTest {
                 "D017", "D018", "D019", "D020", "D021", "D022", "D023", "D024",
                 "D025", "D026", "D027", "D028", "D029"
         );
-        verify(syncWriter).refreshInstitutionDepartmentCodes();
     }
 
     private FullDataInstitution institution() {
@@ -213,18 +238,10 @@ class MedicalInstitutionDataSyncServiceTest {
         return new FullDataInstitution(
                 hpid,
                 "테스트의원",
-                "C",
                 "의원",
-                null,
-                null,
                 false,
                 "02-0000-0000",
-                null,
                 "서울특별시 강남구 테스트로 1",
-                "12345",
-                null,
-                null,
-                null,
                 new BigDecimal("37.5000000"),
                 new BigDecimal("127.0000000"),
                 hours,
@@ -244,6 +261,7 @@ class MedicalInstitutionDataSyncServiceTest {
                 new AppProperties.PublicData(
                         true,
                         "test-service-key",
+                        unusedUrl,
                         unusedUrl,
                         unusedUrl,
                         unusedUrl,

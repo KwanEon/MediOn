@@ -1,8 +1,11 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import GuidePage from '../pages/GuidePage';
+import HealthPage from '../pages/HealthPage';
 import MainLayout from '../layout/MainLayout';
 import HomePage from '../pages/HomePage';
 import InfoPage from '../pages/InfoPage';
 import LoginPage from '../pages/LoginPage';
+import NoticesPage from '../pages/NoticesPage';
 import ProfilePage from '../pages/ProfilePage';
 import RegisterPage from '../pages/RegisterPage';
 
@@ -16,18 +19,9 @@ function RoutesSetup() {
           <Route index element={<HomePage initialCategory="ALL" />} />
           <Route path="institutions" element={<HomePage initialCategory="ALL" />} />
           <Route path="emergency" element={<HomePage initialCategory="EMERGENCY_ROOM" />} />
-          <Route
-            path="health"
-            element={<InfoPage eyebrow="건강 정보" title="건강 정보" description="공공 의료데이터와 신뢰할 수 있는 건강 정보를 준비하고 있습니다." />}
-          />
-          <Route
-            path="notices"
-            element={<InfoPage eyebrow="메디온 소식" title="공지사항" description="서비스 운영 및 의료데이터 갱신 소식을 안내합니다." />}
-          />
-          <Route
-            path="guide"
-            element={<InfoPage eyebrow="서비스 안내" title="이용 안내" description="위치 기반 의료기관 검색과 즐겨찾기 이용 방법을 안내합니다." />}
-          />
+          <Route path="health" element={<HealthPage />} />
+          <Route path="notices" element={<NoticesPage />} />
+          <Route path="guide" element={<GuidePage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route
             path="privacy"

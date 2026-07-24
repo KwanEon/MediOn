@@ -42,6 +42,7 @@ public class PharmacyDataSyncService {
     @EventListener(ApplicationReadyEvent.class)
     public void synchronizeOnStartup() {
         if (!fullDataClient.isEnabled()) {
+            log.info("PUBLIC_DATA_ENABLED=false여서 약국 FullData 동기화를 건너뜁니다.");
             return;
         }
         boolean pharmacyTableEmpty = syncWriter.isPharmacyTableEmpty();
@@ -67,7 +68,7 @@ public class PharmacyDataSyncService {
     )
     public void synchronize() {
         if (!fullDataClient.isEnabled()) {
-            log.warn("공공데이터 서비스 키가 없어 약국 FullData 동기화를 건너뜁니다.");
+            log.info("PUBLIC_DATA_ENABLED=false여서 약국 FullData 동기화를 건너뜁니다.");
             return;
         }
         if (!synchronizationRunning.compareAndSet(false, true)) {
@@ -101,6 +102,7 @@ public class PharmacyDataSyncService {
         int pageNumber = 1;
         int expectedTotalCount = -1;
         int maxPageCount = Integer.MAX_VALUE;
+        int receivedItemCount = 0;
         Set<String> receivedHpids = new HashSet<>();
 
         do {
@@ -116,26 +118,47 @@ public class PharmacyDataSyncService {
             } else if (page.totalCount() != expectedTotalCount) {
                 throw new IllegalStateException("약국 FullData 전체 건수가 페이지 사이에 변경되었습니다.");
             }
-            if (page.items().isEmpty() && receivedHpids.size() < expectedTotalCount) {
+            if (page.items().isEmpty() && receivedItemCount < expectedTotalCount) {
                 throw new IllegalStateException("약국 FullData 페이지가 전체 건수 전에 비었습니다.");
             }
+            int uniqueCountBeforePage = receivedHpids.size();
             syncWriter.upsertPharmacies(page.items(), syncRunId, syncedAt);
+            receivedItemCount += page.items().size();
             page.items().forEach(pharmacy -> receivedHpids.add(pharmacy.hpid()));
             log.info(
-                    "약국 FullData 페이지 저장: page={}, 페이지 건수={}, 누적={}/{}",
+                    "약국 FullData 페이지 저장: page={}, 페이지 건수={}, "
+                            + "누적 수신={}/{}, 고유 HPID={}",
                     pageNumber,
                     page.items().size(),
-                    receivedHpids.size(),
-                    expectedTotalCount
+                    receivedItemCount,
+                    expectedTotalCount,
+                    receivedHpids.size()
             );
-            if (receivedHpids.size() > expectedTotalCount) {
-                throw new IllegalStateException("약국 FullData 수신 건수가 전체 건수를 초과했습니다.");
+            if (!page.items().isEmpty() && receivedHpids.size() == uniqueCountBeforePage) {
+                throw new IllegalStateException("약국 FullData에 동일한 페이지가 반복되었습니다.");
+            }
+            if (receivedItemCount > expectedTotalCount) {
+                throw new IllegalStateException(
+                        "약국 FullData 수신 행 수가 전체 건수를 초과했습니다: "
+                                + receivedItemCount + "/" + expectedTotalCount
+                );
             }
             pageNumber++;
-            if (pageNumber > maxPageCount && receivedHpids.size() < expectedTotalCount) {
+            if (pageNumber > maxPageCount && receivedItemCount < expectedTotalCount) {
                 throw new IllegalStateException("약국 FullData에 중복 페이지가 반복되었습니다.");
             }
-        } while (receivedHpids.size() < expectedTotalCount);
+        } while (receivedItemCount < expectedTotalCount);
+
+        int duplicateHpidCount = receivedItemCount - receivedHpids.size();
+        if (duplicateHpidCount > 0) {
+            log.warn(
+                    "약국 FullData에 중복 HPID가 있어 고유 기관 기준으로 저장했습니다: "
+                            + "수신 행={}, 고유 HPID={}, 중복 행={}",
+                    receivedItemCount,
+                    receivedHpids.size(),
+                    duplicateHpidCount
+            );
+        }
 
         return receivedHpids.size();
     }

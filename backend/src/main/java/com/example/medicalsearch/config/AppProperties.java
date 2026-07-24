@@ -23,6 +23,7 @@ public record AppProperties(
             URI hospitalFullDataUrl,
             URI hospitalDepartmentListUrl,
             URI pharmacyFullDataUrl,
+            URI emergencyBedAvailabilityUrl,
             Duration timeout,
             int syncPageSize,
             boolean syncOnStartup

@@ -108,6 +108,7 @@ class NationalMedicalCenterFullDataClientTest {
                         serverBaseUri.resolve("/full-data"),
                         serverBaseUri.resolve("/departments"),
                         serverBaseUri.resolve("/pharmacies"),
+                        unusedUrl,
                         Duration.ofSeconds(1),
                         1000,
                         false
@@ -139,16 +140,10 @@ class NationalMedicalCenterFullDataClientTest {
                       <item>
                         <hpid>A0000001</hpid>
                         <dutyName>테스트내과의원</dutyName>
-                        <dutyDiv>C</dutyDiv>
                         <dutyDivNam>의원</dutyDivNam>
-                        <dutyEmcls>G099</dutyEmcls>
-                        <dutyEmclsName>응급의료기관 이외</dutyEmclsName>
                         <dutyEryn>1</dutyEryn>
                         <dutyTel1>02-0000-0001</dutyTel1>
-                        <dutyTel3>02-0000-0002</dutyTel3>
                         <dutyAddr>서울특별시 강남구 테스트로 1</dutyAddr>
-                        <postCdn1>123</postCdn1>
-                        <postCdn2>456</postCdn2>
                         <wgs84Lat>37.5000000</wgs84Lat>
                         <wgs84Lon>127.0000000</wgs84Lon>
                         <dutyTime1s>0000</dutyTime1s>
@@ -157,7 +152,6 @@ class NationalMedicalCenterFullDataClientTest {
                       <item>
                         <hpid>A0000002</hpid>
                         <dutyName>좌표없는의원</dutyName>
-                        <dutyDiv>C</dutyDiv>
                         <dutyDivNam>의원</dutyDivNam>
                         <dutyAddr>서울특별시 강남구 좌표없는로 1</dutyAddr>
                         <dutyTime2s>1800</dutyTime2s>

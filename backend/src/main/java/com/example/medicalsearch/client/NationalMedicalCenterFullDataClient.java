@@ -12,13 +12,17 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.DayOfWeek;
+import java.time.Duration;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -38,9 +42,14 @@ public class NationalMedicalCenterFullDataClient {
     private static final LocalTime END_OF_DAY = LocalTime.of(23, 59, 59);
     private static final int MINUTES_PER_DAY = 24 * 60;
     private static final int MAX_EXTENDED_HOUR = 47;
+    private static final int MAX_REQUEST_ATTEMPTS = 8;
+    private static final long MIN_REQUEST_INTERVAL_MILLIS = 1_000L;
+    private static final long INITIAL_RETRY_DELAY_MILLIS = 2_000L;
+    private static final long MAX_RETRY_DELAY_MILLIS = 60_000L;
 
     private final AppProperties.PublicData properties;
     private final HttpClient httpClient;
+    private long nextRequestAtNanos;
 
     public NationalMedicalCenterFullDataClient(AppProperties appProperties) {
         this.properties = appProperties.publicData();
@@ -52,9 +61,7 @@ public class NationalMedicalCenterFullDataClient {
     }
 
     public boolean isEnabled() {
-        return properties.enabled()
-                && properties.serviceKey() != null
-                && !properties.serviceKey().isBlank();
+        return properties.enabled();
     }
 
     public FullDataPage fetchFullDataPage(int pageNumber) {
@@ -114,7 +121,8 @@ public class NationalMedicalCenterFullDataClient {
         }
         return new DepartmentPage(
                 List.copyOf(hpids),
-                parseRequiredTotalCount(documentText(document, "totalCount"))
+                parseRequiredTotalCount(documentText(document, "totalCount")),
+                itemNodes.getLength()
         );
     }
 
@@ -140,21 +148,10 @@ public class NationalMedicalCenterFullDataClient {
         return new FullDataInstitution(
                 hpid,
                 name,
-                childText(itemNode, "dutyDiv"),
                 childText(itemNode, "dutyDivNam", "dutyDivName"),
-                childText(itemNode, "dutyEmcls"),
-                childText(itemNode, "dutyEmclsName"),
                 "1".equals(childText(itemNode, "dutyEryn")),
                 childText(itemNode, "dutyTel1"),
-                childText(itemNode, "dutyTel3"),
                 childText(itemNode, "dutyAddr"),
-                combinePostalCode(
-                        childText(itemNode, "postCdn1"),
-                        childText(itemNode, "postCdn2")
-                ),
-                childText(itemNode, "dutyEtc"),
-                childText(itemNode, "dutyMapimg"),
-                childText(itemNode, "dutyInf"),
                 latitude,
                 longitude,
                 Map.copyOf(operatingHours),
@@ -249,32 +246,151 @@ public class NationalMedicalCenterFullDataClient {
         return URI.create(endpoint + separator + query);
     }
 
-    private Document request(URI requestUri, String label) {
+    private synchronized Document request(URI requestUri, String label) {
         HttpRequest request = HttpRequest.newBuilder(requestUri)
                 .timeout(properties.timeout())
                 .header("Accept", "application/xml, text/xml")
                 .header("User-Agent", "medion-full-data-sync/1.0")
                 .GET()
                 .build();
-        try {
-            HttpResponse<byte[]> response = httpClient.send(
-                    request,
-                    HttpResponse.BodyHandlers.ofByteArray()
-            );
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+
+        for (int attempt = 1; attempt <= MAX_REQUEST_ATTEMPTS; attempt++) {
+            waitForRequestSlot(label);
+            HttpResponse<byte[]> response;
+            try {
+                response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new PublicDataClientException(label + " API 조회가 중단되었습니다.", exception);
+            } catch (IOException exception) {
+                if (attempt == MAX_REQUEST_ATTEMPTS) {
+                    throw new PublicDataClientException(label + " API에 연결할 수 없습니다.", exception);
+                }
+                waitBeforeRetry(label, attempt, retryDelayMillis(attempt), "연결 오류");
+                continue;
+            }
+
+            int statusCode = response.statusCode();
+            if (statusCode < 200 || statusCode >= 300) {
+                if (isRetryableStatus(statusCode) && attempt < MAX_REQUEST_ATTEMPTS) {
+                    waitBeforeRetry(
+                            label,
+                            attempt,
+                            retryDelayMillis(response, attempt),
+                            "HTTP " + statusCode
+                    );
+                    continue;
+                }
+                if (statusCode == 429) {
+                    throw new PublicDataRateLimitException(
+                            label + " API 요청 한도를 초과했습니다."
+                    );
+                }
                 throw new PublicDataClientException(
-                        label + " API가 HTTP " + response.statusCode() + "을 반환했습니다."
+                        label + " API가 HTTP " + statusCode + "을 반환했습니다."
                 );
             }
+
             Document document = parseXml(response.body());
+            if (isRateLimitResponse(document)) {
+                if (attempt < MAX_REQUEST_ATTEMPTS) {
+                    waitBeforeRetry(
+                            label,
+                            attempt,
+                            retryDelayMillis(attempt),
+                            "요청 한도 초과 응답"
+                    );
+                    continue;
+                }
+                throw new PublicDataRateLimitException(
+                        label + " API 요청 한도를 초과했습니다."
+                );
+            }
             verifySuccessfulResponse(document, label);
             return document;
+        }
+
+        throw new PublicDataClientException(label + " API 재시도 횟수를 초과했습니다.");
+    }
+
+    private void waitForRequestSlot(String label) {
+        long waitNanos = nextRequestAtNanos - System.nanoTime();
+        if (waitNanos > 0) {
+            sleep(label, waitNanos, "호출 간격 대기");
+        }
+        nextRequestAtNanos = System.nanoTime()
+                + TimeUnit.MILLISECONDS.toNanos(MIN_REQUEST_INTERVAL_MILLIS);
+    }
+
+    private void waitBeforeRetry(
+            String label,
+            int completedAttempt,
+            long delayMillis,
+            String reason
+    ) {
+        log.warn(
+                "{} API 요청 실패({}). {}/{}회 시도 후 {}초 뒤 재시도합니다.",
+                label,
+                reason,
+                completedAttempt,
+                MAX_REQUEST_ATTEMPTS,
+                Duration.ofMillis(delayMillis).toSeconds()
+        );
+        sleep(label, TimeUnit.MILLISECONDS.toNanos(delayMillis), "재시도 대기");
+    }
+
+    private void sleep(String label, long waitNanos, String reason) {
+        try {
+            TimeUnit.NANOSECONDS.sleep(waitNanos);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            throw new PublicDataClientException(label + " API 조회가 중단되었습니다.", exception);
-        } catch (IOException exception) {
-            throw new PublicDataClientException(label + " API에 연결할 수 없습니다.", exception);
+            throw new PublicDataClientException(
+                    label + " API " + reason + "가 중단되었습니다.",
+                    exception
+            );
         }
+    }
+
+    private boolean isRetryableStatus(int statusCode) {
+        return statusCode == 429 || statusCode >= 500;
+    }
+
+    private boolean isRateLimitResponse(Document document) {
+        String resultCode = documentText(document, "resultCode");
+        if ("22".equals(resultCode)) {
+            return true;
+        }
+        String resultMessage = firstNonBlank(
+                documentText(document, "resultMsg"),
+                documentText(document, "returnAuthMsg"),
+                documentText(document, "errMsg")
+        );
+        return resultMessage != null
+                && resultMessage.toUpperCase(Locale.ROOT)
+                        .contains("LIMITED_NUMBER_OF_SERVICE_REQUESTS");
+    }
+
+    private long retryDelayMillis(HttpResponse<?> response, int attempt) {
+        return response.headers().firstValue("Retry-After")
+                .flatMap(this::parseRetryAfterSeconds)
+                .map(seconds -> Math.min(
+                        seconds,
+                        MAX_RETRY_DELAY_MILLIS / 1_000L
+                ) * 1_000L)
+                .orElseGet(() -> retryDelayMillis(attempt));
+    }
+
+    private Optional<Long> parseRetryAfterSeconds(String value) {
+        try {
+            return Optional.of(Math.max(1L, Long.parseLong(value.trim())));
+        } catch (NumberFormatException exception) {
+            return Optional.empty();
+        }
+    }
+
+    private long retryDelayMillis(int attempt) {
+        long multiplier = 1L << Math.min(attempt - 1, 10);
+        return Math.min(INITIAL_RETRY_DELAY_MILLIS * multiplier, MAX_RETRY_DELAY_MILLIS);
     }
 
     private Document parseXml(byte[] responseBody) {
@@ -369,18 +485,14 @@ public class NationalMedicalCenterFullDataClient {
         }
     }
 
-    private String combinePostalCode(String first, String second) {
-        if (first == null) {
-            return second;
-        }
-        if (second == null) {
-            return first;
-        }
-        return first + second;
-    }
-
     private String encodedServiceKey() {
-        String serviceKey = properties.serviceKey().trim();
+        String configuredServiceKey = properties.serviceKey();
+        if (configuredServiceKey == null || configuredServiceKey.isBlank()) {
+            throw new PublicDataClientException(
+                    "공공데이터 인증키가 없습니다. DATA_GO_KR_SERVICE_KEY를 설정해 주세요."
+            );
+        }
+        String serviceKey = configuredServiceKey.trim();
         if (ENCODED_CHARACTER_PATTERN.matcher(serviceKey).find()) {
             serviceKey = URLDecoder.decode(serviceKey, StandardCharsets.UTF_8);
         }
@@ -407,24 +519,20 @@ public class NationalMedicalCenterFullDataClient {
     public record FullDataPage(List<FullDataInstitution> items, int totalCount) {
     }
 
-    public record DepartmentPage(List<String> hpids, int totalCount) {
+    public record DepartmentPage(List<String> hpids, int totalCount, int itemCount) {
+
+        public DepartmentPage(List<String> hpids, int totalCount) {
+            this(hpids, totalCount, hpids.size());
+        }
     }
 
     public record FullDataInstitution(
             String hpid,
             String name,
-            String institutionKindCode,
             String institutionKindName,
-            String emergencyClassCode,
-            String emergencyClassName,
             boolean emergencyRoomAvailable,
             String phoneNumber,
-            String emergencyPhone,
             String roadAddress,
-            String postalCode,
-            String note,
-            String mapDescription,
-            String description,
             BigDecimal latitude,
             BigDecimal longitude,
             Map<DayOfWeek, DailyOperatingHours> operatingHours,

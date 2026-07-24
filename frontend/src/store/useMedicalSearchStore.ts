@@ -1,6 +1,13 @@
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
-import { fetchAllNearbyInstitutions } from '../api/institutions';
+import {
+  addFavorite as addFavoriteRequest,
+  fetchFavorites,
+  removeFavorite as removeFavoriteRequest
+} from '../api/favorites';
+import {
+  fetchAllNearbyInstitutions,
+  fetchEmergencyBedAvailability
+} from '../api/institutions';
 import { getCategory, INITIAL_LOCATION } from '../constants/institutions';
 import type {
   CategoryId,
@@ -11,25 +18,31 @@ import type {
   NearbyInstitutionResponse
 } from '../types/institution';
 
+type LocationMode = 'INITIAL' | 'ACCOUNT' | 'CURRENT' | 'ADDRESS';
+
 interface MedicalSearchState {
   location: Coordinates;
   locationLabel: string;
+  locationMode: LocationMode;
   response: NearbyInstitutionResponse | null;
   selectedCategory: CategoryId;
   selectedHospitalDepartment: HospitalDepartmentId;
   radiusMeters: number;
   operatingSchedule: OperatingScheduleFilter;
+  openNowOnly: boolean;
+  resultSize: number;
   keyword: string;
   submittedKeyword: string;
   favoritesOnly: boolean;
   favorites: InstitutionId[];
+  favoriteUserId: number | null;
   loading: boolean;
   locating: boolean;
   locationReady: boolean;
   locationAttempted: boolean;
+  searchRevision: number;
   accountUserId: number | null;
   error: string;
-  previewMode: boolean;
   selectedId: InstitutionId | null;
   mobileMenuOpen: boolean;
 }
@@ -39,54 +52,86 @@ interface MedicalSearchActions {
   setSelectedHospitalDepartment: (selectedHospitalDepartment: HospitalDepartmentId) => void;
   setRadiusMeters: (radiusMeters: number) => void;
   setOperatingSchedule: (operatingSchedule: OperatingScheduleFilter) => void;
+  setOpenNowOnly: (openNowOnly: boolean) => void;
+  setResultSize: (resultSize: number) => void;
   setKeyword: (keyword: string) => void;
   submitSearch: () => void;
   clearSearch: () => void;
   setFavoritesOnly: (favoritesOnly: boolean) => void;
-  toggleFavorite: (id: InstitutionId) => void;
+  loadFavorites: (userId: number) => Promise<void>;
+  clearFavorites: () => void;
+  toggleFavorite: (id: InstitutionId) => Promise<void>;
   setSelectedId: (selectedId: InstitutionId | null) => void;
   toggleMobileMenu: () => void;
   closeMobileMenu: () => void;
   loadNearbyInstitutions: () => Promise<void>;
   requestCurrentLocation: () => void;
-  setAccountLocation: (userId: number, location: Coordinates, address: string) => void;
+  setAddressLocation: (
+    userId: number | null,
+    location: Coordinates,
+    address: string
+  ) => void;
+  setAccountLocation: (
+    userId: number,
+    location: Coordinates,
+    address: string,
+    force?: boolean
+  ) => void;
 }
 
 export type MedicalSearchStore = MedicalSearchState & MedicalSearchActions;
 
-type PersistedMedicalSearchState = Pick<MedicalSearchStore, 'favorites'>;
-
 let activeSearchKey: string | null = null;
 let activeSearchSequence = 0;
+let activeLocationRequestSequence = 0;
+let activeSearchController: AbortController | null = null;
+let activeEmergencyBedController: AbortController | null = null;
+let favoriteLoadSequence = 0;
+const pendingFavoriteMutations = new Set<string>();
+
+function cancelActiveInstitutionRequests() {
+  activeSearchSequence += 1;
+  activeSearchKey = null;
+  activeSearchController?.abort();
+  activeEmergencyBedController?.abort();
+  activeSearchController = null;
+  activeEmergencyBedController = null;
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === 'AbortError';
+}
 
 const initialState: MedicalSearchState = {
   location: INITIAL_LOCATION,
   locationLabel: '현재 위치 확인 중',
+  locationMode: 'INITIAL',
   response: null,
   selectedCategory: 'ALL',
   selectedHospitalDepartment: 'ALL',
   radiusMeters: 3000,
   operatingSchedule: 'ALL',
+  openNowOnly: true,
+  resultSize: 100,
   keyword: '',
   submittedKeyword: '',
   favoritesOnly: false,
   favorites: [],
+  favoriteUserId: null,
   loading: false,
   locating: false,
   locationReady: false,
   locationAttempted: false,
+  searchRevision: 0,
   accountUserId: null,
   error: '',
-  previewMode: false,
   selectedId: null,
   mobileMenuOpen: false
 };
 
-export const useMedicalSearchStore = create<MedicalSearchStore>()(
-  persist<MedicalSearchStore, [], [], PersistedMedicalSearchState>(
-    (set, get) => ({
-      ...initialState,
-      setSelectedCategory: (selectedCategory) => set((state) => ({
+export const useMedicalSearchStore = create<MedicalSearchStore>((set, get) => ({
+  ...initialState,
+  setSelectedCategory: (selectedCategory) => set((state) => ({
         selectedCategory,
         selectedHospitalDepartment: selectedCategory === 'HOSPITAL'
           ? state.selectedHospitalDepartment
@@ -100,41 +145,129 @@ export const useMedicalSearchStore = create<MedicalSearchStore>()(
       }),
       setRadiusMeters: (radiusMeters) => set({ radiusMeters, selectedId: null }),
       setOperatingSchedule: (operatingSchedule) => set({ operatingSchedule, selectedId: null }),
+      setOpenNowOnly: (openNowOnly) => set({ openNowOnly, selectedId: null }),
+      setResultSize: (resultSize) => set({ resultSize, selectedId: null }),
       setKeyword: (keyword) => set({ keyword }),
       submitSearch: () => set((state) => ({ submittedKeyword: state.keyword.trim(), selectedId: null })),
       clearSearch: () => set({ keyword: '', submittedKeyword: '', selectedId: null }),
       setFavoritesOnly: (favoritesOnly) => set({ favoritesOnly, selectedId: null }),
-      toggleFavorite: (id) => set((state) => ({
-        favorites: state.favorites.includes(id)
-          ? state.favorites.filter((favoriteId) => favoriteId !== id)
-          : [...state.favorites, id]
-      })),
+      loadFavorites: async (userId) => {
+        const loadSequence = ++favoriteLoadSequence;
+        set({ favorites: [], favoriteUserId: userId, favoritesOnly: false });
+        try {
+          const favorites = await fetchFavorites();
+          if (loadSequence === favoriteLoadSequence && get().favoriteUserId === userId) {
+            set({ favorites });
+          }
+        } catch (error: unknown) {
+          if (loadSequence === favoriteLoadSequence && get().favoriteUserId === userId) {
+            set({
+              favorites: [],
+              error: error instanceof Error
+                ? error.message
+                : '즐겨찾기를 불러오지 못했습니다.'
+            });
+          }
+        }
+      },
+      clearFavorites: () => {
+        favoriteLoadSequence += 1;
+        set({ favorites: [], favoriteUserId: null, favoritesOnly: false });
+      },
+      toggleFavorite: async (id) => {
+        const { favoriteUserId, favorites } = get();
+        if (favoriteUserId === null) {
+          return;
+        }
+
+        const mutationKey = `${favoriteUserId}:${id}`;
+        if (pendingFavoriteMutations.has(mutationKey)) {
+          return;
+        }
+
+        const wasFavorite = favorites.includes(id);
+        pendingFavoriteMutations.add(mutationKey);
+        set((state) => ({
+          favorites: wasFavorite
+            ? state.favorites.filter((favoriteId) => favoriteId !== id)
+            : state.favorites.includes(id) ? state.favorites : [...state.favorites, id]
+        }));
+
+        try {
+          if (wasFavorite) {
+            await removeFavoriteRequest(id);
+          } else {
+            await addFavoriteRequest(id);
+          }
+        } catch (error: unknown) {
+          if (get().favoriteUserId === favoriteUserId) {
+            set((state) => ({
+              favorites: wasFavorite
+                ? state.favorites.includes(id) ? state.favorites : [...state.favorites, id]
+                : state.favorites.filter((favoriteId) => favoriteId !== id),
+              error: error instanceof Error
+                ? error.message
+                : '즐겨찾기를 변경하지 못했습니다.'
+            }));
+          }
+        } finally {
+          pendingFavoriteMutations.delete(mutationKey);
+        }
+      },
       setSelectedId: (selectedId) => set({ selectedId }),
       toggleMobileMenu: () => set((state) => ({ mobileMenuOpen: !state.mobileMenuOpen })),
       closeMobileMenu: () => set({ mobileMenuOpen: false }),
-      setAccountLocation: (userId, location, address) => {
-        const locationLabel = `등록 주소 기준 · ${address}`;
+      setAddressLocation: (userId, location, address) => {
+        activeLocationRequestSequence += 1;
+        cancelActiveInstitutionRequests();
+        set((state) => ({
+          location,
+          locationLabel: `주소 검색 · ${address}`,
+          locationMode: 'ADDRESS',
+          locationReady: true,
+          locationAttempted: true,
+          accountUserId: userId,
+          locating: false,
+          loading: true,
+          response: null,
+          error: '',
+          selectedId: null,
+          searchRevision: state.searchRevision + 1
+        }));
+      },
+      setAccountLocation: (userId, location, address, force = false) => {
+        const locationLabel = `내 주소 · ${address}`;
         const current = get();
-        if (current.accountUserId === userId
+        if (!force
+          && current.accountUserId === userId
+          && current.locationMode === 'ADDRESS'
+          && current.locationReady) {
+          return;
+        }
+        const isCurrentAccountLocation = current.accountUserId === userId
           && current.locationReady
           && current.location.lat === location.lat
           && current.location.lng === location.lng
-          && current.locationLabel === locationLabel) {
+          && current.locationLabel === locationLabel;
+        if (isCurrentAccountLocation && !force) {
           return;
         }
-        activeSearchSequence += 1;
-        activeSearchKey = null;
-        set({
+        activeLocationRequestSequence += 1;
+        cancelActiveInstitutionRequests();
+        set((state) => ({
           location,
           locationLabel,
+          locationMode: 'ACCOUNT',
           locationReady: true,
           locationAttempted: false,
           accountUserId: userId,
           locating: false,
+          loading: true,
           response: null,
           error: '',
-          selectedId: null
-        });
+          selectedId: null,
+          searchRevision: state.searchRevision + 1
+        }));
       },
       loadNearbyInstitutions: async () => {
         const {
@@ -143,7 +276,9 @@ export const useMedicalSearchStore = create<MedicalSearchStore>()(
           radiusMeters,
           selectedCategory,
           selectedHospitalDepartment,
-          operatingSchedule
+          operatingSchedule,
+          openNowOnly,
+          resultSize
         } = get();
         if (!locationReady) {
           return;
@@ -155,14 +290,21 @@ export const useMedicalSearchStore = create<MedicalSearchStore>()(
           radiusMeters,
           types.join(','),
           selectedHospitalDepartment,
-          operatingSchedule
+          operatingSchedule,
+          openNowOnly,
+          resultSize
         ].join(':');
         if (get().loading && activeSearchKey === searchKey) {
           return;
         }
 
+        activeSearchController?.abort();
+        activeEmergencyBedController?.abort();
+        const searchController = new AbortController();
         const searchSequence = ++activeSearchSequence;
         activeSearchKey = searchKey;
+        activeSearchController = searchController;
+        activeEmergencyBedController = null;
         set({ loading: true, error: '' });
 
         try {
@@ -174,25 +316,104 @@ export const useMedicalSearchStore = create<MedicalSearchStore>()(
               ? undefined
               : selectedHospitalDepartment,
             operatingSchedule,
-            size: 100
-          });
+            openNowOnly,
+            size: resultSize
+          }, searchController.signal);
           if (searchSequence !== activeSearchSequence) {
             return;
           }
-          set({ response, previewMode: false });
+          const responseWithAvailabilityState: NearbyInstitutionResponse = {
+            ...response,
+            items: response.items.map((institution) => ({
+              ...institution,
+              emergencyBedAvailabilityLoading: institution.type === 'EMERGENCY_ROOM'
+            }))
+          };
+          set({ response: responseWithAvailabilityState });
+
+          const emergencyInstitutionIds = responseWithAvailabilityState.items
+            .filter((institution) => institution.type === 'EMERGENCY_ROOM')
+            .map((institution) => institution.id);
+          if (emergencyInstitutionIds.length > 0) {
+            const emergencyBedController = new AbortController();
+            activeEmergencyBedController = emergencyBedController;
+            void fetchEmergencyBedAvailability(
+              emergencyInstitutionIds,
+              emergencyBedController.signal
+            ).then(({ availableBeds }) => {
+              if (searchSequence !== activeSearchSequence
+                || activeEmergencyBedController !== emergencyBedController) {
+                return;
+              }
+              set((state) => {
+                if (state.response !== responseWithAvailabilityState) {
+                  return {};
+                }
+                return {
+                  response: {
+                    ...responseWithAvailabilityState,
+                    items: responseWithAvailabilityState.items.map((institution) => {
+                      if (institution.type !== 'EMERGENCY_ROOM') {
+                        return institution;
+                      }
+                      const availableEmergencyBeds = availableBeds[String(institution.id)];
+                      return {
+                        ...institution,
+                        emergencyBedAvailabilityLoading: false,
+                        availableEmergencyBeds: typeof availableEmergencyBeds === 'number'
+                          ? availableEmergencyBeds
+                          : null
+                      };
+                    })
+                  }
+                };
+              });
+            }).catch((error: unknown) => {
+              if (isAbortError(error)
+                || searchSequence !== activeSearchSequence
+                || activeEmergencyBedController !== emergencyBedController) {
+                return;
+              }
+              set((state) => {
+                if (state.response !== responseWithAvailabilityState) {
+                  return {};
+                }
+                return {
+                  response: {
+                    ...responseWithAvailabilityState,
+                    items: responseWithAvailabilityState.items.map((institution) => (
+                      institution.type === 'EMERGENCY_ROOM'
+                        ? {
+                            ...institution,
+                            emergencyBedAvailabilityLoading: false,
+                            availableEmergencyBeds: null
+                          }
+                        : institution
+                    ))
+                  }
+                };
+              });
+            }).finally(() => {
+              if (activeEmergencyBedController === emergencyBedController) {
+                activeEmergencyBedController = null;
+              }
+            });
+          }
         } catch (error: unknown) {
-          if (searchSequence !== activeSearchSequence) {
+          if (searchSequence !== activeSearchSequence || isAbortError(error)) {
             return;
           }
           set({
             response: null,
-            previewMode: false,
             selectedId: null,
             error: error instanceof Error
               ? error.message
               : '의료기관 정보를 불러오지 못했습니다.'
           });
         } finally {
+          if (activeSearchController === searchController) {
+            activeSearchController = null;
+          }
           if (searchSequence === activeSearchSequence) {
             activeSearchKey = null;
             set({ loading: false });
@@ -200,11 +421,13 @@ export const useMedicalSearchStore = create<MedicalSearchStore>()(
         }
       },
       requestCurrentLocation: () => {
+        const locationRequestSequence = ++activeLocationRequestSequence;
         const current = get();
         const hadReadyLocation = current.locationReady && current.accountUserId === null;
         set({
           location: hadReadyLocation ? current.location : INITIAL_LOCATION,
           locationLabel: hadReadyLocation ? current.locationLabel : '현재 위치 확인 중',
+          locationMode: hadReadyLocation ? current.locationMode : 'INITIAL',
           response: hadReadyLocation ? current.response : null,
           error: '',
           locating: true,
@@ -224,31 +447,40 @@ export const useMedicalSearchStore = create<MedicalSearchStore>()(
         }
 
         navigator.geolocation.getCurrentPosition(
-          (position) => set({
-            location: {
-              lat: position.coords.latitude,
-              lng: position.coords.longitude
-            },
-            locationLabel: '현재 위치',
-            locating: false,
-            locationReady: true,
-            accountUserId: null,
-            selectedId: null
-          }),
-          () => set({
-            error: '위치 권한을 허용한 뒤 내 위치로 찾기 버튼을 다시 눌러 주세요.',
-            locationLabel: hadReadyLocation ? get().locationLabel : '현재 위치 권한 필요',
-            locating: false,
-            selectedId: null
-          }),
+          (position) => {
+            if (locationRequestSequence !== activeLocationRequestSequence) {
+              return;
+            }
+            cancelActiveInstitutionRequests();
+            set((state) => ({
+              location: {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude
+              },
+              locationLabel: '현재 위치',
+              locationMode: 'CURRENT',
+              locating: false,
+              loading: true,
+              locationReady: true,
+              accountUserId: null,
+              response: null,
+              error: '',
+              selectedId: null,
+              searchRevision: state.searchRevision + 1
+            }));
+          },
+          () => {
+            if (locationRequestSequence !== activeLocationRequestSequence) {
+              return;
+            }
+            set({
+              error: '위치 권한을 허용한 뒤 내 위치로 찾기 버튼을 다시 눌러 주세요.',
+              locationLabel: hadReadyLocation ? get().locationLabel : '현재 위치 권한 필요',
+              locating: false,
+              selectedId: null
+            });
+          },
           { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
         );
-      }
-    }),
-    {
-      name: 'medion-search-store',
-      storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({ favorites: state.favorites })
-    }
-  )
-);
+  }
+}));

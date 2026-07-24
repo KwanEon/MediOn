@@ -2,9 +2,10 @@ import { Link } from 'react-router-dom';
 
 interface BrandProps {
   compact?: boolean;
+  showTagline?: boolean;
 }
 
-function Brand({ compact = false }: BrandProps) {
+function Brand({ compact = false, showTagline = true }: BrandProps) {
   if (compact) {
     return (
       <Link className="footer-brand" to="/" aria-label="메디온 홈">
@@ -18,7 +19,7 @@ function Brand({ compact = false }: BrandProps) {
     <Link className="brand" to="/" aria-label="메디온 홈">
       <span className="brand-mark" aria-hidden="true"><span /></span>
       <strong>메디<span>온</span></strong>
-      <small>내 주변 의료기관 찾기</small>
+      {showTagline && <small>내 주변 의료기관 찾기</small>}
     </Link>
   );
 }
