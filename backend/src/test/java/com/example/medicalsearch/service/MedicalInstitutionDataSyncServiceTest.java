@@ -199,6 +199,108 @@ class MedicalInstitutionDataSyncServiceTest {
     }
 
     @Test
+    void restartsFullDataFromTheFirstPageWhenTotalCountChanges() {
+        List<FullDataInstitution> firstPage = IntStream.range(0, 1_000)
+                .mapToObj(index -> institution("A" + String.format("%07d", index)))
+                .toList();
+        FullDataInstitution lastInstitution = institution("A9999998");
+        FullDataInstitution addedInstitution = institution("A9999999");
+        when(fullDataClient.fetchFullDataPage(1))
+                .thenReturn(
+                        new FullDataPage(firstPage, 1_001),
+                        new FullDataPage(firstPage, 1_002)
+                );
+        when(fullDataClient.fetchFullDataPage(2))
+                .thenReturn(
+                        new FullDataPage(List.of(lastInstitution), 1_002),
+                        new FullDataPage(List.of(lastInstitution, addedInstitution), 1_002)
+                );
+        when(fullDataClient.fetchDepartmentPage(anyString(), anyInt()))
+                .thenReturn(new DepartmentPage(List.of(), 0));
+
+        service.synchronize();
+
+        verify(fullDataClient, times(2)).fetchFullDataPage(1);
+        verify(fullDataClient, times(2)).fetchFullDataPage(2);
+        verify(syncWriter, times(3)).upsertInstitutions(
+                any(),
+                anyString(),
+                any(LocalDateTime.class)
+        );
+        verify(syncWriter).deactivateMissingHospitals(anyString(), any(LocalDateTime.class));
+        verify(syncWriter).recordHistory(
+                org.mockito.ArgumentMatchers.eq(DataSyncStatus.SUCCESS),
+                any(LocalDateTime.class),
+                anyString()
+        );
+    }
+
+    @Test
+    void preservesExistingInstitutionsWhenTotalCountNeverStabilizes() {
+        List<FullDataInstitution> firstPage = IntStream.range(0, 1_000)
+                .mapToObj(index -> institution("A" + String.format("%07d", index)))
+                .toList();
+        FullDataInstitution lastInstitution = institution("A9999999");
+        when(fullDataClient.fetchFullDataPage(1))
+                .thenReturn(
+                        new FullDataPage(firstPage, 1_001),
+                        new FullDataPage(firstPage, 1_002),
+                        new FullDataPage(firstPage, 1_003)
+                );
+        when(fullDataClient.fetchFullDataPage(2))
+                .thenReturn(
+                        new FullDataPage(List.of(lastInstitution), 1_002),
+                        new FullDataPage(List.of(lastInstitution), 1_003),
+                        new FullDataPage(List.of(lastInstitution), 1_004)
+                );
+
+        service.synchronize();
+
+        verify(fullDataClient, times(3)).fetchFullDataPage(1);
+        verify(fullDataClient, times(3)).fetchFullDataPage(2);
+        verify(syncWriter, never()).deactivateMissingHospitals(
+                anyString(),
+                any(LocalDateTime.class)
+        );
+        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
+        verify(syncWriter).recordHistory(
+                org.mockito.ArgumentMatchers.eq(DataSyncStatus.FAILED),
+                any(LocalDateTime.class),
+                messageCaptor.capture()
+        );
+        assertThat(messageCaptor.getValue()).contains("3회 수집 시도");
+    }
+
+    @Test
+    void restartsDepartmentFromTheFirstPageWhenTotalCountChanges() {
+        when(fullDataClient.fetchFullDataPage(1))
+                .thenReturn(new FullDataPage(List.of(institution()), 1));
+        when(fullDataClient.fetchDepartmentPage(anyString(), anyInt()))
+                .thenReturn(new DepartmentPage(List.of(), 0));
+        when(fullDataClient.fetchDepartmentPage("D001", 1))
+                .thenReturn(
+                        new DepartmentPage(List.of("A0000001", "A0000002"), 3, 2),
+                        new DepartmentPage(List.of("A0000001", "A0000002"), 4, 2)
+                );
+        when(fullDataClient.fetchDepartmentPage("D001", 2))
+                .thenReturn(
+                        new DepartmentPage(List.of("A0000003"), 4, 1),
+                        new DepartmentPage(List.of("A0000003", "A0000004"), 4, 2)
+                );
+
+        service.synchronize();
+
+        verify(fullDataClient, times(2)).fetchDepartmentPage("D001", 1);
+        verify(fullDataClient, times(2)).fetchDepartmentPage("D001", 2);
+        verify(syncWriter).deleteStaleDepartments(anyString());
+        verify(syncWriter).recordHistory(
+                org.mockito.ArgumentMatchers.eq(DataSyncStatus.SUCCESS),
+                any(LocalDateTime.class),
+                anyString()
+        );
+    }
+
+    @Test
     void synchronizesEveryQdCode() {
         when(fullDataClient.fetchFullDataPage(1))
                 .thenReturn(new FullDataPage(List.of(institution()), 1));

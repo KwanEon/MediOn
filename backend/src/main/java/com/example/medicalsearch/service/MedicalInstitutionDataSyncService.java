@@ -15,6 +15,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.IntSupplier;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -26,6 +27,7 @@ import org.springframework.stereotype.Service;
 public class MedicalInstitutionDataSyncService {
 
     private static final Logger log = LogManager.getLogger(MedicalInstitutionDataSyncService.class);
+    private static final int MAX_SNAPSHOT_ATTEMPTS = 3;
 
     private final NationalMedicalCenterFullDataClient fullDataClient;
     private final MedicalInstitutionSyncWriter syncWriter;
@@ -149,6 +151,13 @@ public class MedicalInstitutionDataSyncService {
     }
 
     private int synchronizeFullData(String syncRunId, LocalDateTime syncedAt) {
+        return synchronizeStableSnapshot(
+                "병·의원 FullData",
+                () -> synchronizeFullDataAttempt(syncRunId, syncedAt)
+        );
+    }
+
+    private int synchronizeFullDataAttempt(String syncRunId, LocalDateTime syncedAt) {
         int pageNumber = 1;
         int expectedTotalCount = -1;
         int maxPageCount = Integer.MAX_VALUE;
@@ -166,7 +175,11 @@ public class MedicalInstitutionDataSyncService {
                 expectedTotalCount = page.totalCount();
                 maxPageCount = expectedPageCount(expectedTotalCount) + 1;
             } else if (page.totalCount() != expectedTotalCount) {
-                throw new IllegalStateException("병·의원 FullData 전체 건수가 페이지 사이에 변경되었습니다.");
+                throw new SnapshotChangedException(
+                        "page=" + pageNumber
+                                + ", 시작 전체 건수=" + expectedTotalCount
+                                + ", 현재 전체 건수=" + page.totalCount()
+                );
             }
             if (page.items().isEmpty() && receivedItemCount < expectedTotalCount) {
                 throw new IllegalStateException("병·의원 FullData 페이지가 전체 건수 전에 비었습니다.");
@@ -234,6 +247,16 @@ public class MedicalInstitutionDataSyncService {
             HospitalDepartment department,
             String syncRunId
     ) {
+        return synchronizeStableSnapshot(
+                "진료과목 " + department.getPublicDataCode(),
+                () -> synchronizeDepartmentAttempt(department, syncRunId)
+        );
+    }
+
+    private int synchronizeDepartmentAttempt(
+            HospitalDepartment department,
+            String syncRunId
+    ) {
         int pageNumber = 1;
         int expectedTotalCount = -1;
         int maxPageCount = Integer.MAX_VALUE;
@@ -248,8 +271,10 @@ public class MedicalInstitutionDataSyncService {
                 expectedTotalCount = page.totalCount();
                 maxPageCount = expectedPageCount(expectedTotalCount) + 1;
             } else if (page.totalCount() != expectedTotalCount) {
-                throw new IllegalStateException(
-                        department.getPublicDataCode() + " 진료과목 전체 건수가 페이지 사이에 변경되었습니다."
+                throw new SnapshotChangedException(
+                        "page=" + pageNumber
+                                + ", 시작 전체 건수=" + expectedTotalCount
+                                + ", 현재 전체 건수=" + page.totalCount()
                 );
             }
             if (page.itemCount() == 0 && receivedItemCount < expectedTotalCount) {
@@ -296,6 +321,32 @@ public class MedicalInstitutionDataSyncService {
         return receivedHpids.size();
     }
 
+    private int synchronizeStableSnapshot(String label, IntSupplier synchronization) {
+        for (int attempt = 1; attempt <= MAX_SNAPSHOT_ATTEMPTS; attempt++) {
+            try {
+                return synchronization.getAsInt();
+            } catch (SnapshotChangedException exception) {
+                if (attempt == MAX_SNAPSHOT_ATTEMPTS) {
+                    throw new IllegalStateException(
+                            label + " 전체 건수가 계속 변경되어 "
+                                    + MAX_SNAPSHOT_ATTEMPTS
+                                    + "회 수집 시도 후 중단했습니다. 기존 활성 데이터는 유지합니다.",
+                            exception
+                    );
+                }
+                log.warn(
+                        "{} 전체 건수가 수집 도중 변경되어 첫 페이지부터 다시 시도합니다: "
+                                + "시도={}/{}, {}",
+                        label,
+                        attempt + 1,
+                        MAX_SNAPSHOT_ATTEMPTS,
+                        exception.getMessage()
+                );
+            }
+        }
+        throw new IllegalStateException(label + " 동기화를 완료하지 못했습니다.");
+    }
+
     private int expectedPageCount(int totalCount) {
         int pageSize = Math.max(1, appProperties.publicData().syncPageSize());
         return Math.max(1, (int) Math.ceil((double) totalCount / pageSize));
@@ -306,6 +357,13 @@ public class MedicalInstitutionDataSyncService {
             syncWriter.recordHistory(DataSyncStatus.FAILED, startedAt, message);
         } catch (RuntimeException historyException) {
             log.error("동기화 실패 이력 저장에도 실패했습니다: {}", historyException.getMessage());
+        }
+    }
+
+    private static final class SnapshotChangedException extends RuntimeException {
+
+        private SnapshotChangedException(String message) {
+            super(message);
         }
     }
 }
