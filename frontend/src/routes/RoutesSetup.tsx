@@ -1,9 +1,12 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import DepartmentGuidePage from '../pages/DepartmentGuidePage';
+import DeveloperDashboardPage from '../pages/DeveloperDashboardPage';
 import GuidePage from '../pages/GuidePage';
 import HealthPage from '../pages/HealthPage';
 import MainLayout from '../layout/MainLayout';
 import HomePage from '../pages/HomePage';
 import InfoPage from '../pages/InfoPage';
+import InquiryPage from '../pages/InquiryPage';
 import LoginPage from '../pages/LoginPage';
 import NoticesPage from '../pages/NoticesPage';
 import ProfilePage from '../pages/ProfilePage';
@@ -20,9 +23,12 @@ function RoutesSetup() {
           <Route path="institutions" element={<HomePage initialCategory="ALL" />} />
           <Route path="emergency" element={<HomePage initialCategory="EMERGENCY_ROOM" />} />
           <Route path="health" element={<HealthPage />} />
+          <Route path="health/departments" element={<DepartmentGuidePage />} />
           <Route path="notices" element={<NoticesPage />} />
           <Route path="guide" element={<GuidePage />} />
+          <Route path="inquiry" element={<InquiryPage />} />
           <Route path="profile" element={<ProfilePage />} />
+          <Route path="developer" element={<DeveloperDashboardPage />} />
           <Route
             path="privacy"
             element={<InfoPage eyebrow="정책" title="개인정보처리방침" description="위치 정보와 개인정보 처리 기준을 안내합니다." />}

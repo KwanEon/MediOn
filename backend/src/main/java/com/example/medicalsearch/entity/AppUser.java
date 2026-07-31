@@ -2,6 +2,8 @@ package com.example.medicalsearch.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -22,6 +24,10 @@ public class AppUser {
 
     @Column(name = "password_hash", nullable = false, length = 100)
     private String passwordHash;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private UserRole role;
 
     @Column(nullable = false, length = 50)
     private String name;
@@ -61,8 +67,35 @@ public class AppUser {
             BigDecimal longitude,
             LocalDateTime createdAt
     ) {
+        this(
+                username,
+                passwordHash,
+                UserRole.USER,
+                name,
+                email,
+                phoneNumber,
+                address,
+                latitude,
+                longitude,
+                createdAt
+        );
+    }
+
+    public AppUser(
+            String username,
+            String passwordHash,
+            UserRole role,
+            String name,
+            String email,
+            String phoneNumber,
+            String address,
+            BigDecimal latitude,
+            BigDecimal longitude,
+            LocalDateTime createdAt
+    ) {
         this.username = username;
         this.passwordHash = passwordHash;
+        this.role = role;
         this.name = name;
         this.email = email;
         this.phoneNumber = phoneNumber;
@@ -83,6 +116,10 @@ public class AppUser {
 
     public String getPasswordHash() {
         return passwordHash;
+    }
+
+    public UserRole getRole() {
+        return role;
     }
 
     public String getName() {
@@ -109,6 +146,14 @@ public class AppUser {
         return longitude;
     }
 
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
     public void updateAddress(
             String address,
             BigDecimal latitude,
@@ -118,6 +163,28 @@ public class AppUser {
         this.address = address;
         this.latitude = latitude;
         this.longitude = longitude;
+        this.updatedAt = updatedAt;
+    }
+
+    public void updateProfile(
+            String name,
+            String email,
+            String address,
+            BigDecimal latitude,
+            BigDecimal longitude,
+            LocalDateTime updatedAt
+    ) {
+        this.name = name;
+        this.email = email;
+        this.address = address;
+        this.latitude = latitude;
+        this.longitude = longitude;
+        this.updatedAt = updatedAt;
+    }
+
+    public void configureDeveloperAccount(String encodedPassword, LocalDateTime updatedAt) {
+        this.passwordHash = encodedPassword;
+        this.role = UserRole.DEVELOPER;
         this.updatedAt = updatedAt;
     }
 }

@@ -23,6 +23,10 @@ const HEALTH_GUIDES = [
       '피부 발진이나 가려움은 피부과',
       '영유아와 청소년의 증상은 소아청소년과'
     ],
+    link: {
+      label: '전체 보기',
+      to: '/health/departments'
+    },
     tone: 'blue'
   },
   {
@@ -132,7 +136,7 @@ function HealthPage() {
             <p>메디온 건강 가이드</p>
             <h2 id="health-guide-title">상황별로 확인해 보세요</h2>
           </div>
-          <span>최근 검토 2026.07.24</span>
+          <span>최근 검토 2026.07.28</span>
         </div>
 
         <div className="health-guide-grid">
@@ -150,6 +154,12 @@ function HealthPage() {
                 <ul>
                   {guide.items.map((item) => <li key={item}>{item}</li>)}
                 </ul>
+                {'link' in guide && guide.link ? (
+                  <Link to={guide.link.to}>
+                    {guide.link.label}
+                    <ArrowRight size={14} />
+                  </Link>
+                ) : null}
                 {'source' in guide && guide.source ? (
                   <a href={guide.source.href} target="_blank" rel="noreferrer">
                     {guide.source.label}

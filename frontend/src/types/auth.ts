@@ -7,6 +7,7 @@ export interface AuthUser {
   address: string;
   latitude: number;
   longitude: number;
+  role: 'USER' | 'DEVELOPER';
 }
 
 export interface LoginRequest {
@@ -21,7 +22,9 @@ export interface RegisterRequest extends LoginRequest {
   address: string;
 }
 
-export interface UpdateAddressRequest {
+export interface UpdateProfileRequest {
+  name: string;
+  email: string;
   address: string;
 }
 

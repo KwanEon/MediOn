@@ -18,5 +18,7 @@ public interface UserFavoriteRepository extends JpaRepository<UserFavorite, Long
 
     boolean existsByUserIdAndInstitutionId(Long userId, Long institutionId);
 
+    long countByUserId(Long userId);
+
     void deleteByUserIdAndInstitutionId(Long userId, Long institutionId);
 }

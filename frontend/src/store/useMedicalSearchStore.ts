@@ -5,8 +5,8 @@ import {
   removeFavorite as removeFavoriteRequest
 } from '../api/favorites';
 import {
-  fetchAllNearbyInstitutions,
-  fetchEmergencyBedAvailability
+  fetchEmergencyBedAvailability,
+  fetchNearbyInstitutions
 } from '../api/institutions';
 import { getCategory, INITIAL_LOCATION } from '../constants/institutions';
 import type {
@@ -30,7 +30,7 @@ interface MedicalSearchState {
   radiusMeters: number;
   operatingSchedule: OperatingScheduleFilter;
   openNowOnly: boolean;
-  resultSize: number;
+  pageNumber: number;
   keyword: string;
   submittedKeyword: string;
   favoritesOnly: boolean;
@@ -53,7 +53,7 @@ interface MedicalSearchActions {
   setRadiusMeters: (radiusMeters: number) => void;
   setOperatingSchedule: (operatingSchedule: OperatingScheduleFilter) => void;
   setOpenNowOnly: (openNowOnly: boolean) => void;
-  setResultSize: (resultSize: number) => void;
+  setPageNumber: (pageNumber: number) => void;
   setKeyword: (keyword: string) => void;
   submitSearch: () => void;
   clearSearch: () => void;
@@ -112,7 +112,7 @@ const initialState: MedicalSearchState = {
   radiusMeters: 3000,
   operatingSchedule: 'ALL',
   openNowOnly: true,
-  resultSize: 100,
+  pageNumber: 0,
   keyword: '',
   submittedKeyword: '',
   favoritesOnly: false,
@@ -136,21 +136,40 @@ export const useMedicalSearchStore = create<MedicalSearchStore>((set, get) => ({
         selectedHospitalDepartment: selectedCategory === 'HOSPITAL'
           ? state.selectedHospitalDepartment
           : 'ALL',
+        pageNumber: 0,
         selectedId: null
       })),
       setSelectedHospitalDepartment: (selectedHospitalDepartment) => set({
         selectedHospitalDepartment,
         selectedCategory: 'HOSPITAL',
+        pageNumber: 0,
         selectedId: null
       }),
-      setRadiusMeters: (radiusMeters) => set({ radiusMeters, selectedId: null }),
-      setOperatingSchedule: (operatingSchedule) => set({ operatingSchedule, selectedId: null }),
-      setOpenNowOnly: (openNowOnly) => set({ openNowOnly, selectedId: null }),
-      setResultSize: (resultSize) => set({ resultSize, selectedId: null }),
+      setRadiusMeters: (radiusMeters) => set({ radiusMeters, pageNumber: 0, selectedId: null }),
+      setOperatingSchedule: (operatingSchedule) => set({
+        operatingSchedule,
+        pageNumber: 0,
+        selectedId: null
+      }),
+      setOpenNowOnly: (openNowOnly) => set({ openNowOnly, pageNumber: 0, selectedId: null }),
+      setPageNumber: (pageNumber) => set({ pageNumber, selectedId: null }),
       setKeyword: (keyword) => set({ keyword }),
-      submitSearch: () => set((state) => ({ submittedKeyword: state.keyword.trim(), selectedId: null })),
-      clearSearch: () => set({ keyword: '', submittedKeyword: '', selectedId: null }),
-      setFavoritesOnly: (favoritesOnly) => set({ favoritesOnly, selectedId: null }),
+      submitSearch: () => set((state) => ({
+        submittedKeyword: state.keyword.trim(),
+        pageNumber: 0,
+        selectedId: null
+      })),
+      clearSearch: () => set({
+        keyword: '',
+        submittedKeyword: '',
+        pageNumber: 0,
+        selectedId: null
+      }),
+      setFavoritesOnly: (favoritesOnly) => set({
+        favoritesOnly,
+        pageNumber: 0,
+        selectedId: null
+      }),
       loadFavorites: async (userId) => {
         const loadSequence = ++favoriteLoadSequence;
         set({ favorites: [], favoriteUserId: userId, favoritesOnly: false });
@@ -231,6 +250,7 @@ export const useMedicalSearchStore = create<MedicalSearchStore>((set, get) => ({
           loading: true,
           response: null,
           error: '',
+          pageNumber: 0,
           selectedId: null,
           searchRevision: state.searchRevision + 1
         }));
@@ -265,6 +285,7 @@ export const useMedicalSearchStore = create<MedicalSearchStore>((set, get) => ({
           loading: true,
           response: null,
           error: '',
+          pageNumber: 0,
           selectedId: null,
           searchRevision: state.searchRevision + 1
         }));
@@ -278,7 +299,8 @@ export const useMedicalSearchStore = create<MedicalSearchStore>((set, get) => ({
           selectedHospitalDepartment,
           operatingSchedule,
           openNowOnly,
-          resultSize
+          submittedKeyword,
+          pageNumber
         } = get();
         if (!locationReady) {
           return;
@@ -292,7 +314,8 @@ export const useMedicalSearchStore = create<MedicalSearchStore>((set, get) => ({
           selectedHospitalDepartment,
           operatingSchedule,
           openNowOnly,
-          resultSize
+          submittedKeyword,
+          pageNumber
         ].join(':');
         if (get().loading && activeSearchKey === searchKey) {
           return;
@@ -308,16 +331,18 @@ export const useMedicalSearchStore = create<MedicalSearchStore>((set, get) => ({
         set({ loading: true, error: '' });
 
         try {
-          const response = await fetchAllNearbyInstitutions({
+          const response = await fetchNearbyInstitutions({
             ...location,
             radiusMeters,
+            keyword: submittedKeyword,
             types,
             hospitalDepartment: selectedHospitalDepartment === 'ALL'
               ? undefined
               : selectedHospitalDepartment,
             operatingSchedule,
             openNowOnly,
-            size: resultSize
+            page: pageNumber,
+            size: 30
           }, searchController.signal);
           if (searchSequence !== activeSearchSequence) {
             return;
@@ -465,6 +490,7 @@ export const useMedicalSearchStore = create<MedicalSearchStore>((set, get) => ({
               accountUserId: null,
               response: null,
               error: '',
+              pageNumber: 0,
               selectedId: null,
               searchRevision: state.searchRevision + 1
             }));

@@ -7,7 +7,6 @@ import {
   Clock3,
   Grid2X2,
   Hospital,
-  ListFilter,
   MapPin,
   Pill,
   Star,
@@ -33,11 +32,6 @@ const RADIUS_OPTIONS = [
   { value: '5000', label: '반경 5km' }
 ] as const;
 
-const RESULT_SIZE_OPTIONS = [100, 200, 300, 400, 500].map((size) => ({
-  value: String(size),
-  label: `${size}개`
-}));
-
 const OPERATING_SCHEDULE_OPTIONS = [
   { value: 'ALL', label: '전체' },
   { value: 'NIGHT', label: '야간진료' },
@@ -54,7 +48,6 @@ function FilterBar() {
   const radiusMeters = useMedicalSearchStore((state) => state.radiusMeters);
   const operatingSchedule = useMedicalSearchStore((state) => state.operatingSchedule);
   const openNowOnly = useMedicalSearchStore((state) => state.openNowOnly);
-  const resultSize = useMedicalSearchStore((state) => state.resultSize);
   const favoritesOnly = useMedicalSearchStore((state) => state.favoritesOnly);
   const setSelectedCategory = useMedicalSearchStore((state) => state.setSelectedCategory);
   const setSelectedHospitalDepartment = useMedicalSearchStore(
@@ -63,7 +56,6 @@ function FilterBar() {
   const setRadiusMeters = useMedicalSearchStore((state) => state.setRadiusMeters);
   const setOperatingSchedule = useMedicalSearchStore((state) => state.setOperatingSchedule);
   const setOpenNowOnly = useMedicalSearchStore((state) => state.setOpenNowOnly);
-  const setResultSize = useMedicalSearchStore((state) => state.setResultSize);
   const setFavoritesOnly = useMedicalSearchStore((state) => state.setFavoritesOnly);
 
   return (
@@ -121,14 +113,6 @@ function FilterBar() {
           value={String(radiusMeters)}
           options={RADIUS_OPTIONS}
           onChange={(value) => setRadiusMeters(Number(value))}
-        />
-        <FilterDropdown
-          ariaLabel="검색 결과 개수"
-          className="result-size-select-control"
-          icon={ListFilter}
-          value={String(resultSize)}
-          options={RESULT_SIZE_OPTIONS}
-          onChange={(value) => setResultSize(Number(value))}
         />
         <FilterDropdown
           ariaLabel="야간 및 휴일 진료"

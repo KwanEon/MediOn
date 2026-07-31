@@ -489,7 +489,8 @@ public class NationalMedicalCenterFullDataClient {
         String configuredServiceKey = properties.serviceKey();
         if (configuredServiceKey == null || configuredServiceKey.isBlank()) {
             throw new PublicDataClientException(
-                    "공공데이터 인증키가 없습니다. DATA_GO_KR_SERVICE_KEY를 설정해 주세요."
+                    "공공데이터 인증키가 없습니다. application-secret.properties의 "
+                            + "app.public-data.service-key를 설정해 주세요."
             );
         }
         String serviceKey = configuredServiceKey.trim();

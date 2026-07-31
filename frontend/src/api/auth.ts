@@ -3,7 +3,7 @@ import type {
   AuthUser,
   LoginRequest,
   RegisterRequest,
-  UpdateAddressRequest
+  UpdateProfileRequest
 } from '../types/auth';
 
 interface ApiErrorResponse {
@@ -27,8 +27,8 @@ export async function register(request: RegisterRequest): Promise<AuthUser> {
   return requestJson<AuthUser>('/api/v1/auth/register', request);
 }
 
-export async function updateAddress(request: UpdateAddressRequest): Promise<AuthUser> {
-  return requestJson<AuthUser>('/api/v1/auth/me/address', request, 'PATCH');
+export async function updateProfile(request: UpdateProfileRequest): Promise<AuthUser> {
+  return requestJson<AuthUser>('/api/v1/auth/me', request, 'PATCH');
 }
 
 export async function logout(): Promise<void> {

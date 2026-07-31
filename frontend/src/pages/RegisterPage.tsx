@@ -6,6 +6,7 @@ import Brand from '../components/Brand';
 import { searchAddresses } from '../api/auth';
 import { useAuthStore } from '../store/useAuthStore';
 import type { AddressSearchResult, RegisterRequest } from '../types/auth';
+import { formatKoreanPhoneNumber } from '../utils/phoneNumberFormat';
 
 const INITIAL_FORM: RegisterRequest = {
   username: '',
@@ -125,7 +126,15 @@ function RegisterPage() {
             <input type="email" value={form.email} onChange={(event) => updateField('email', event.target.value)} autoComplete="email" maxLength={150} required placeholder="example@email.com" />
           </AuthField>
           <AuthField label="전화번호" icon={<Phone size={18} />}>
-            <input type="tel" value={form.phoneNumber} onChange={(event) => updateField('phoneNumber', event.target.value)} autoComplete="tel" maxLength={30} required placeholder="010-1234-5678" />
+            <input
+              type="tel"
+              inputMode="numeric"
+              value={form.phoneNumber}
+              onChange={(event) => updateField('phoneNumber', formatKoreanPhoneNumber(event.target.value))}
+              autoComplete="tel"
+              required
+              placeholder="010-1234-5678"
+            />
           </AuthField>
           <div className="auth-field is-wide address-search-field">
             <label htmlFor="register-address">주소</label>
