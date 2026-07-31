@@ -13,6 +13,7 @@ public interface InstitutionSearchService {
             double lat,
             double lng,
             Integer radiusMeters,
+            String keyword,
             List<InstitutionType> types,
             HospitalDepartment hospitalDepartment,
             OperatingScheduleFilter operatingSchedule,

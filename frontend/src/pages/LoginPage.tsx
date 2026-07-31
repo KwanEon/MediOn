@@ -24,7 +24,7 @@ function LoginPage() {
   }, [clearError]);
 
   if (user) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={user.role === 'DEVELOPER' ? '/developer' : '/'} replace />;
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -36,7 +36,7 @@ function LoginPage() {
         { lat: authenticatedUser.latitude, lng: authenticatedUser.longitude },
         authenticatedUser.address
       );
-      navigate('/', { replace: true });
+      navigate(authenticatedUser.role === 'DEVELOPER' ? '/developer' : '/', { replace: true });
     } catch {
       // The authentication store exposes the user-facing error message.
     }

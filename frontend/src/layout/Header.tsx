@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LogIn, LogOut, Menu, UserRound, X } from 'lucide-react';
+import { LogIn, LogOut, Menu, ShieldCheck, UserRound, X } from 'lucide-react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import Brand from '../components/Brand';
 import ConfirmationModal from '../components/ConfirmationModal';
@@ -14,9 +14,11 @@ interface NavigationItem {
 
 const NAV_ITEMS: readonly NavigationItem[] = [
   { to: '/', label: '홈', end: true },
-  { to: '/health', label: '건강 정보' },
+  { to: '/health/departments', label: '진료과 찾기' },
+  { to: '/health', label: '건강 정보', end: true },
   { to: '/notices', label: '공지사항' },
-  { to: '/guide', label: '이용 안내' }
+  { to: '/guide', label: '이용 안내' },
+  { to: '/inquiry', label: '문의하기' }
 ];
 
 function Header() {
@@ -60,6 +62,17 @@ function Header() {
         <div className="header-actions">
           {user ? (
             <>
+              {user.role === 'DEVELOPER' && (
+                <Link
+                  className="developer-header-link"
+                  to="/developer"
+                  aria-label="개발자 대시보드"
+                  title="개발자 대시보드"
+                >
+                  <ShieldCheck size={18} />
+                  <span>개발자 대시보드</span>
+                </Link>
+              )}
               <Link className="account-link" to="/profile" aria-label="내 정보" title="내 정보">
                 <UserRound size={19} />
                 <span>{user.name}</span>

@@ -17,11 +17,23 @@ export function createPreviewResponse(
   radiusMeters: number
 ): NearbyInstitutionResponse {
   const syncedAt = new Date().toISOString();
+  const typeCounts = items.reduce<Record<InstitutionType, number>>(
+    (counts, institution) => {
+      counts[institution.type] += 1;
+      return counts;
+    },
+    {
+      HOSPITAL: 0,
+      PHARMACY: 0,
+      EMERGENCY_ROOM: 0
+    }
+  );
 
   return {
     requestedAt: syncedAt,
     radiusMeters,
     lastSyncedAt: syncedAt,
+    typeCounts,
     items,
     page: { number: 0, size: items.length, totalElements: items.length, totalPages: 1 }
   };
@@ -38,7 +50,17 @@ export function createPreviewInstitutions(center: Coordinates): NearbyInstitutio
   ];
 
   return sampleData.map((item, index) => {
-    const [type, name, roadAddress, phoneNumber, latOffset, lngOffset, distanceMeters, todayOpenTime, todayCloseTime] = item;
+    const [
+      type,
+      name,
+      roadAddress,
+      phoneNumber,
+      latOffset,
+      lngOffset,
+      distanceMeters,
+      todayOpenTime,
+      todayCloseTime
+    ] = item;
 
     return {
       id: `preview-${index + 1}`,

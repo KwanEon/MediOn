@@ -5,6 +5,7 @@ import com.example.medicalsearch.dto.AddressSearchItemResponse;
 import com.example.medicalsearch.dto.LoginRequest;
 import com.example.medicalsearch.dto.RegisterRequest;
 import com.example.medicalsearch.dto.UpdateAddressRequest;
+import com.example.medicalsearch.dto.UpdateProfileRequest;
 import com.example.medicalsearch.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -83,6 +84,14 @@ public class AuthController {
             @Valid @RequestBody UpdateAddressRequest request
     ) {
         return authService.updateAddress(authentication.getName(), request);
+    }
+
+    @PatchMapping("/me")
+    AuthUserResponse updateProfile(
+            Authentication authentication,
+            @Valid @RequestBody UpdateProfileRequest request
+    ) {
+        return authService.updateProfile(authentication.getName(), request);
     }
 
     @GetMapping("/addresses")

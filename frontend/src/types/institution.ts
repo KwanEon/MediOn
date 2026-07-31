@@ -82,6 +82,7 @@ export interface NearbyInstitutionResponse {
   requestedAt: string;
   radiusMeters: number;
   lastSyncedAt: string | null;
+  typeCounts: Record<InstitutionType, number>;
   items: NearbyInstitution[];
   page: PageResponse;
 }
@@ -92,6 +93,7 @@ export interface EmergencyBedAvailabilityResponse {
 
 export interface NearbyInstitutionSearchParams extends Coordinates {
   radiusMeters?: number;
+  keyword?: string;
   types?: readonly InstitutionType[];
   hospitalDepartment?: Exclude<HospitalDepartmentId, 'ALL'>;
   operatingSchedule?: OperatingScheduleFilter;

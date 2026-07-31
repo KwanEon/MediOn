@@ -10,6 +10,7 @@ import com.example.medicalsearch.service.InstitutionSearchService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Size;
 import java.util.List;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -35,17 +36,19 @@ public class InstitutionSearchController {
             @RequestParam double lat,
             @RequestParam double lng,
             @RequestParam(required = false) Integer radiusMeters,
+            @RequestParam(required = false) @Size(max = 100) String keyword,
             @RequestParam(defaultValue = "HOSPITAL,PHARMACY,EMERGENCY_ROOM") List<InstitutionType> types,
             @RequestParam(required = false) HospitalDepartment hospitalDepartment,
             @RequestParam(defaultValue = "ALL") OperatingScheduleFilter operatingSchedule,
             @RequestParam(defaultValue = "true") boolean openNowOnly,
             @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "100") @Min(1) @Max(500) int size
+            @RequestParam(defaultValue = "30") @Min(1) @Max(500) int size
     ) {
         return institutionSearchService.searchNearby(
                 lat,
                 lng,
                 radiusMeters,
+                keyword,
                 types,
                 hospitalDepartment,
                 operatingSchedule,

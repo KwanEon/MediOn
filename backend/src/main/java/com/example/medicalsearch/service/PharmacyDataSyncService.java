@@ -28,6 +28,7 @@ public class PharmacyDataSyncService {
     private final MedicalInstitutionSyncWriter syncWriter;
     private final AppProperties appProperties;
     private final AtomicBoolean synchronizationRunning = new AtomicBoolean(false);
+    private final AtomicBoolean synchronizationRequested = new AtomicBoolean(false);
 
     public PharmacyDataSyncService(
             NationalMedicalCenterFullDataClient fullDataClient,
@@ -96,6 +97,26 @@ public class PharmacyDataSyncService {
         } finally {
             synchronizationRunning.set(false);
         }
+    }
+
+    public boolean requestSynchronization() {
+        if (!fullDataClient.isEnabled()
+                || synchronizationRunning.get()
+                || !synchronizationRequested.compareAndSet(false, true)) {
+            return false;
+        }
+        CompletableFuture.runAsync(() -> {
+            try {
+                synchronize();
+            } finally {
+                synchronizationRequested.set(false);
+            }
+        });
+        return true;
+    }
+
+    public boolean isSynchronizationRunning() {
+        return synchronizationRunning.get() || synchronizationRequested.get();
     }
 
     private int synchronizeFullData(String syncRunId, LocalDateTime syncedAt) {

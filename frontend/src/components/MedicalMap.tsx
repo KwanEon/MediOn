@@ -110,7 +110,7 @@ function InstitutionMarker({ institution, selected, onSelect }: InstitutionMarke
               </div>
             )}
             <div>
-              <dt>거리</dt>
+              <dt>직선거리</dt>
               <dd>{formatDistance(institution.distanceMeters)}</dd>
             </div>
             <div>

@@ -6,6 +6,7 @@ import com.example.medicalsearch.dto.AuthUserResponse;
 import com.example.medicalsearch.dto.AddressSearchItemResponse;
 import com.example.medicalsearch.dto.RegisterRequest;
 import com.example.medicalsearch.dto.UpdateAddressRequest;
+import com.example.medicalsearch.dto.UpdateProfileRequest;
 import com.example.medicalsearch.entity.AppUser;
 import com.example.medicalsearch.repository.AppUserRepository;
 import java.time.LocalDateTime;
@@ -81,6 +82,26 @@ public class AuthService implements UserDetailsService {
         return AuthUserResponse.from(user);
     }
 
+    @Transactional
+    public AuthUserResponse updateProfile(String username, UpdateProfileRequest request) {
+        AppUser user = findUser(username);
+        String email = request.email().trim().toLowerCase(Locale.ROOT);
+        if (userRepository.existsByEmailIgnoreCaseAndIdNot(email, user.getId())) {
+            throw new IllegalArgumentException("이미 사용 중인 이메일입니다.");
+        }
+
+        GeocodedAddress geocodedAddress = geocodingClient.geocode(request.address());
+        user.updateProfile(
+                request.name().trim(),
+                email,
+                geocodedAddress.address(),
+                geocodedAddress.latitude(),
+                geocodedAddress.longitude(),
+                LocalDateTime.now()
+        );
+        return AuthUserResponse.from(user);
+    }
+
     public List<AddressSearchItemResponse> searchAddresses(String query) {
         if (query == null || query.trim().length() < 2) {
             throw new IllegalArgumentException("주소를 두 글자 이상 입력해 주세요.");
@@ -96,7 +117,7 @@ public class AuthService implements UserDetailsService {
         AppUser user = findUser(username);
         return User.withUsername(user.getUsername())
                 .password(user.getPasswordHash())
-                .roles("USER")
+                .roles(user.getRole().name())
                 .build();
     }
 

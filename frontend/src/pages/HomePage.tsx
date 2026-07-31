@@ -29,7 +29,7 @@ function HomePage({ initialCategory = 'ALL' }: HomePageProps) {
   const radiusMeters = useMedicalSearchStore((state) => state.radiusMeters);
   const operatingSchedule = useMedicalSearchStore((state) => state.operatingSchedule);
   const openNowOnly = useMedicalSearchStore((state) => state.openNowOnly);
-  const resultSize = useMedicalSearchStore((state) => state.resultSize);
+  const pageNumber = useMedicalSearchStore((state) => state.pageNumber);
   const submittedKeyword = useMedicalSearchStore((state) => state.submittedKeyword);
   const favoritesOnly = useMedicalSearchStore((state) => state.favoritesOnly);
   const favorites = useMedicalSearchStore((state) => state.favorites);
@@ -43,13 +43,9 @@ function HomePage({ initialCategory = 'ALL' }: HomePageProps) {
 
   const institutions = response?.items ?? [];
   const visibleInstitutions = useMemo(() => {
-    const normalizedKeyword = submittedKeyword.trim().toLowerCase();
     const filteredInstitutions = institutions.filter((institution) => {
-      const medicalDepartments = institution.medicalDepartments ?? [];
-      const searchableText = `${institution.name} ${institution.roadAddress ?? ''} ${institution.institutionKind ?? ''} ${medicalDepartments.join(' ')}`.toLowerCase();
-      const matchesKeyword = !normalizedKeyword || searchableText.includes(normalizedKeyword);
       const matchesFavorite = !favoritesOnly || favorites.includes(institution.id);
-      return matchesKeyword && matchesFavorite;
+      return matchesFavorite;
     });
 
     return filteredInstitutions.sort(
@@ -58,8 +54,7 @@ function HomePage({ initialCategory = 'ALL' }: HomePageProps) {
   }, [
     favorites,
     favoritesOnly,
-    institutions,
-    submittedKeyword
+    institutions
   ]);
 
   useEffect(() => {
@@ -106,7 +101,8 @@ function HomePage({ initialCategory = 'ALL' }: HomePageProps) {
     selectedHospitalDepartment,
     operatingSchedule,
     openNowOnly,
-    resultSize,
+    submittedKeyword,
+    pageNumber,
     searchRevision
   ]);
 

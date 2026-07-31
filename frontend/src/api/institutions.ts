@@ -9,29 +9,17 @@ interface ApiErrorResponse {
   message?: string;
 }
 
-const MAX_SEARCH_RESULTS = 500;
-
-export async function fetchAllNearbyInstitutions(
-  searchParams: NearbyInstitutionSearchParams,
-  signal?: AbortSignal
-): Promise<NearbyInstitutionResponse> {
-  return fetchNearbyInstitutions({
-    ...searchParams,
-    page: 0,
-    size: Math.min(searchParams.size ?? MAX_SEARCH_RESULTS, MAX_SEARCH_RESULTS)
-  }, signal);
-}
-
 export async function fetchNearbyInstitutions({
   lat,
   lng,
   radiusMeters = 3000,
+  keyword,
   types = ['HOSPITAL', 'PHARMACY', 'EMERGENCY_ROOM'],
   hospitalDepartment,
   operatingSchedule = 'ALL',
   openNowOnly = true,
   page = 0,
-  size = 20
+  size = 30
 }: NearbyInstitutionSearchParams, signal?: AbortSignal): Promise<NearbyInstitutionResponse> {
   const params = new URLSearchParams({
     lat: String(lat),
@@ -45,6 +33,9 @@ export async function fetchNearbyInstitutions({
   });
   if (hospitalDepartment) {
     params.set('hospitalDepartment', hospitalDepartment);
+  }
+  if (keyword?.trim()) {
+    params.set('keyword', keyword.trim());
   }
 
   const response = await fetch(`/api/v1/institutions/nearby?${params.toString()}`, {

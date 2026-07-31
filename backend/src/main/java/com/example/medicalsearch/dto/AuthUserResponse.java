@@ -11,7 +11,8 @@ public record AuthUserResponse(
         String phoneNumber,
         String address,
         BigDecimal latitude,
-        BigDecimal longitude
+        BigDecimal longitude,
+        String role
 ) {
     public static AuthUserResponse from(AppUser user) {
         return new AuthUserResponse(
@@ -22,7 +23,8 @@ public record AuthUserResponse(
                 user.getPhoneNumber(),
                 user.getAddress(),
                 user.getLatitude(),
-                user.getLongitude()
+                user.getLongitude(),
+                user.getRole().name()
         );
     }
 }

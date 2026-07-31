@@ -1,6 +1,7 @@
 package com.example.medicalsearch.repository;
 
 import com.example.medicalsearch.entity.MedicalInstitution;
+import com.example.medicalsearch.entity.InstitutionType;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Collection;
@@ -71,6 +72,11 @@ public interface MedicalInstitutionRepository extends JpaRepository<MedicalInsti
              AND oh.day_of_week = :dayOfWeek
             WHERE mi.active = TRUE
               AND (
+                    :keyword IS NULL
+                    OR LOCATE(:keyword, mi.name) > 0
+                    OR LOCATE(:keyword, COALESCE(mi.road_address, '')) > 0
+                  )
+              AND (
                     (:includeHospitals = TRUE AND mi.type = 'HOSPITAL')
                     OR (:includePharmacies = TRUE AND mi.type = 'PHARMACY')
                     OR (:includeEmergencyRooms = TRUE AND mi.emergency_room_available = TRUE)
@@ -136,6 +142,11 @@ public interface MedicalInstitutionRepository extends JpaRepository<MedicalInsti
              AND oh.day_of_week = :dayOfWeek
             WHERE mi.active = TRUE
               AND (
+                    :keyword IS NULL
+                    OR LOCATE(:keyword, mi.name) > 0
+                    OR LOCATE(:keyword, COALESCE(mi.road_address, '')) > 0
+                  )
+              AND (
                     (:includeHospitals = TRUE AND mi.type = 'HOSPITAL')
                     OR (:includePharmacies = TRUE AND mi.type = 'PHARMACY')
                     OR (:includeEmergencyRooms = TRUE AND mi.emergency_room_available = TRUE)
@@ -197,6 +208,7 @@ public interface MedicalInstitutionRepository extends JpaRepository<MedicalInsti
             @Param("lat") double lat,
             @Param("lng") double lng,
             @Param("radiusMeters") int radiusMeters,
+            @Param("keyword") String keyword,
             @Param("includeHospitals") boolean includeHospitals,
             @Param("includePharmacies") boolean includePharmacies,
             @Param("includeEmergencyRooms") boolean includeEmergencyRooms,
@@ -210,6 +222,16 @@ public interface MedicalInstitutionRepository extends JpaRepository<MedicalInsti
 
     @Query("select max(m.lastSyncedAt) from MedicalInstitution m where m.active = true")
     Optional<LocalDateTime> findLatestSyncedAt();
+
+    long countByActiveTrue();
+
+    long countByActiveTrueAndType(InstitutionType type);
+
+    long countByActiveTrueAndEmergencyRoomAvailableTrue();
+
+    long countByActiveFalse();
+
+    long countByActiveTrueAndLastSyncedAtBefore(LocalDateTime threshold);
 
     @Query("""
             select

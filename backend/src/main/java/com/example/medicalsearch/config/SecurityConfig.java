@@ -47,8 +47,10 @@ public class SecurityConfig {
                         .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/institutions/nearby").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/institutions/emergency-beds").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/notices").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/addresses").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login").permitAll()
+                        .requestMatchers("/api/v1/developer/**").hasRole("DEVELOPER")
                         .anyRequest().authenticated()
                 )
                 .build();
