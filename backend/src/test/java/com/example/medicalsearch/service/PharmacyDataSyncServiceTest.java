@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -26,6 +27,7 @@ import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -109,7 +111,46 @@ class PharmacyDataSyncServiceTest {
         );
     }
 
+    @Test
+    void restartsFullDataFromTheFirstPageWhenTotalCountChanges() {
+        List<FullDataInstitution> firstPage = IntStream.range(0, 1_000)
+                .mapToObj(index -> pharmacy("B" + String.format("%07d", index)))
+                .toList();
+        FullDataInstitution lastPharmacy = pharmacy("B9999998");
+        FullDataInstitution addedPharmacy = pharmacy("B9999999");
+        when(fullDataClient.fetchPharmacyFullDataPage(1))
+                .thenReturn(
+                        new FullDataPage(firstPage, 1_001),
+                        new FullDataPage(firstPage, 1_002)
+                );
+        when(fullDataClient.fetchPharmacyFullDataPage(2))
+                .thenReturn(
+                        new FullDataPage(List.of(lastPharmacy), 1_002),
+                        new FullDataPage(List.of(lastPharmacy, addedPharmacy), 1_002)
+                );
+
+        service.synchronize();
+
+        verify(fullDataClient, times(2)).fetchPharmacyFullDataPage(1);
+        verify(fullDataClient, times(2)).fetchPharmacyFullDataPage(2);
+        verify(syncWriter, times(3)).upsertPharmacies(
+                any(),
+                anyString(),
+                any(LocalDateTime.class)
+        );
+        verify(syncWriter).deactivateMissingPharmacies(anyString(), any(LocalDateTime.class));
+        verify(syncWriter).recordPharmacyHistory(
+                org.mockito.ArgumentMatchers.eq(DataSyncStatus.SUCCESS),
+                any(LocalDateTime.class),
+                anyString()
+        );
+    }
+
     private FullDataInstitution pharmacy() {
+        return pharmacy("B0000001");
+    }
+
+    private FullDataInstitution pharmacy(String hpid) {
         Map<DayOfWeek, DailyOperatingHours> hours = Arrays.stream(DayOfWeek.values())
                 .collect(java.util.stream.Collectors.toMap(
                         day -> day,
@@ -118,9 +159,9 @@ class PharmacyDataSyncServiceTest {
                                 LocalTime.of(18, 0),
                                 false
                         )
-                ));
+        ));
         return new FullDataInstitution(
-                "B0000001",
+                hpid,
                 "테스트약국",
                 "약국",
                 false,
