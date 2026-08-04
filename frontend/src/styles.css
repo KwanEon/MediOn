@@ -1203,6 +1203,7 @@ p {
   color: #2d394d;
   font-size: 14px;
   font-weight: 650;
+  overflow-wrap: anywhere;
 }
 
 .profile-address-value {
@@ -1297,6 +1298,7 @@ p {
 .profile-save-success {
   display: inline-flex;
   padding: 10px 12px;
+  grid-column: 1 / -1;
   align-items: center;
   gap: 7px;
   border: 1px solid #a7f3d0;
@@ -1307,6 +1309,7 @@ p {
   font-weight: 700;
 }
 
+.profile-edit-button,
 .profile-save-button {
   display: inline-flex;
   min-height: 44px;
@@ -1322,7 +1325,38 @@ p {
   font-weight: 750;
 }
 
+.profile-edit-button {
+  grid-column: 1 / -1;
+  justify-self: end;
+}
+
+.profile-edit-button:disabled,
 .profile-save-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.profile-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.profile-cancel-button {
+  display: inline-flex;
+  min-height: 44px;
+  padding: 0 17px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid #ccd6e3;
+  border-radius: 10px;
+  color: #536176;
+  background: white;
+  font-weight: 750;
+}
+
+.profile-cancel-button:disabled {
   cursor: not-allowed;
   opacity: 0.58;
 }
@@ -3193,9 +3227,15 @@ p {
     padding: 16px;
   }
 
-  .profile-save-button {
+  .profile-edit-button,
+  .profile-save-button,
+  .profile-cancel-button {
     width: 100%;
     justify-self: stretch;
+  }
+
+  .profile-form-actions {
+    flex-direction: column-reverse;
   }
 
   .footer-inner {
