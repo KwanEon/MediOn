@@ -18,6 +18,7 @@ export async function fetchNearbyInstitutions({
   hospitalDepartment,
   operatingSchedule = 'ALL',
   openNowOnly = true,
+  favoritesOnly = false,
   page = 0,
   size = 30
 }: NearbyInstitutionSearchParams, signal?: AbortSignal): Promise<NearbyInstitutionResponse> {
@@ -28,6 +29,7 @@ export async function fetchNearbyInstitutions({
     types: types.join(','),
     operatingSchedule,
     openNowOnly: String(openNowOnly),
+    favoritesOnly: String(favoritesOnly),
     page: String(page),
     size: String(size)
   });

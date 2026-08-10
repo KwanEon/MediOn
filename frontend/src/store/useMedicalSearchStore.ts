@@ -218,6 +218,10 @@ export const useMedicalSearchStore = create<MedicalSearchStore>((set, get) => ({
           } else {
             await addFavoriteRequest(id);
           }
+          if (get().favoriteUserId === favoriteUserId && get().favoritesOnly) {
+            set({ pageNumber: 0, selectedId: null });
+            await get().loadNearbyInstitutions();
+          }
         } catch (error: unknown) {
           if (get().favoriteUserId === favoriteUserId) {
             set((state) => ({
@@ -300,7 +304,8 @@ export const useMedicalSearchStore = create<MedicalSearchStore>((set, get) => ({
           operatingSchedule,
           openNowOnly,
           submittedKeyword,
-          pageNumber
+          pageNumber,
+          favoritesOnly
         } = get();
         if (!locationReady) {
           return;
@@ -315,7 +320,8 @@ export const useMedicalSearchStore = create<MedicalSearchStore>((set, get) => ({
           operatingSchedule,
           openNowOnly,
           submittedKeyword,
-          pageNumber
+          pageNumber,
+          favoritesOnly
         ].join(':');
         if (get().loading && activeSearchKey === searchKey) {
           return;
@@ -341,6 +347,7 @@ export const useMedicalSearchStore = create<MedicalSearchStore>((set, get) => ({
               : selectedHospitalDepartment,
             operatingSchedule,
             openNowOnly,
+            favoritesOnly,
             page: pageNumber,
             size: 30
           }, searchController.signal);

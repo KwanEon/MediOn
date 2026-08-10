@@ -12,6 +12,9 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 import java.util.List;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 @Validated
 @RestController
@@ -41,9 +45,15 @@ public class InstitutionSearchController {
             @RequestParam(required = false) HospitalDepartment hospitalDepartment,
             @RequestParam(defaultValue = "ALL") OperatingScheduleFilter operatingSchedule,
             @RequestParam(defaultValue = "true") boolean openNowOnly,
+            @RequestParam(defaultValue = "false") boolean favoritesOnly,
             @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "30") @Min(1) @Max(500) int size
+            @RequestParam(defaultValue = "30") @Min(1) @Max(500) int size,
+            Authentication authentication
     ) {
+        if (favoritesOnly
+                && (authentication == null || authentication instanceof AnonymousAuthenticationToken)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "즐겨찾기 검색은 로그인이 필요합니다.");
+        }
         return institutionSearchService.searchNearby(
                 lat,
                 lng,
@@ -54,7 +64,8 @@ public class InstitutionSearchController {
                 operatingSchedule,
                 openNowOnly,
                 page,
-                size
+                size,
+                favoritesOnly ? authentication.getName() : null
         );
     }
 

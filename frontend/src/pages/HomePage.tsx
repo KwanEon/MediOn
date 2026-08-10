@@ -32,7 +32,6 @@ function HomePage({ initialCategory = 'ALL' }: HomePageProps) {
   const pageNumber = useMedicalSearchStore((state) => state.pageNumber);
   const submittedKeyword = useMedicalSearchStore((state) => state.submittedKeyword);
   const favoritesOnly = useMedicalSearchStore((state) => state.favoritesOnly);
-  const favorites = useMedicalSearchStore((state) => state.favorites);
   const selectedId = useMedicalSearchStore((state) => state.selectedId);
   const setSelectedCategory = useMedicalSearchStore((state) => state.setSelectedCategory);
   const setSelectedId = useMedicalSearchStore((state) => state.setSelectedId);
@@ -43,19 +42,10 @@ function HomePage({ initialCategory = 'ALL' }: HomePageProps) {
 
   const institutions = response?.items ?? [];
   const visibleInstitutions = useMemo(() => {
-    const filteredInstitutions = institutions.filter((institution) => {
-      const matchesFavorite = !favoritesOnly || favorites.includes(institution.id);
-      return matchesFavorite;
-    });
-
-    return filteredInstitutions.sort(
+    return [...institutions].sort(
       (first, second) => first.distanceMeters - second.distanceMeters
     );
-  }, [
-    favorites,
-    favoritesOnly,
-    institutions
-  ]);
+  }, [institutions]);
 
   useEffect(() => {
     setSelectedCategory(initialCategory);
@@ -102,6 +92,7 @@ function HomePage({ initialCategory = 'ALL' }: HomePageProps) {
     operatingSchedule,
     openNowOnly,
     submittedKeyword,
+    favoritesOnly,
     pageNumber,
     searchRevision
   ]);
