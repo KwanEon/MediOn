@@ -39,7 +39,6 @@ class _MainShellState extends State<MainShell> {
   bool _healthNoticeEnabled = false;
   bool _locationSearchEnabled = true;
   Set<int> _favoriteIds = {};
-  final Map<int, Institution> _knownInstitutions = {};
 
   bool get _isLoggedIn => _currentUser != null;
 
@@ -201,14 +200,6 @@ class _MainShellState extends State<MainShell> {
     }
   }
 
-  void _rememberInstitutions(List<Institution> institutions) {
-    setState(() {
-      for (final institution in institutions) {
-        _knownInstitutions[institution.id] = institution;
-      }
-    });
-  }
-
   Future<void> _toggleFavorite(Institution institution) async {
     if (!_isLoggedIn) {
       ScaffoldMessenger.of(
@@ -219,7 +210,6 @@ class _MainShellState extends State<MainShell> {
 
     final wasFavorite = _favoriteIds.contains(institution.id);
     setState(() {
-      _knownInstitutions[institution.id] = institution;
       if (wasFavorite) {
         _favoriteIds.remove(institution.id);
       } else {
@@ -286,14 +276,6 @@ class _MainShellState extends State<MainShell> {
       return;
     }
 
-    final favoriteInstitutions =
-        _knownInstitutions.values
-            .where((institution) => _favoriteIds.contains(institution.id))
-            .toList()
-          ..sort(
-            (left, right) =>
-                left.distanceMeters.compareTo(right.distanceMeters),
-          );
     final signedOut = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => MyPage(
@@ -305,8 +287,6 @@ class _MainShellState extends State<MainShell> {
               _savedAddress = user.address;
             });
           },
-          favoriteInstitutions: favoriteInstitutions,
-          onFavoriteToggle: _toggleFavorite,
           healthNoticeEnabled: _healthNoticeEnabled,
           onHealthNoticeChanged: _setHealthNoticeEnabled,
           locationSearchEnabled: _locationSearchEnabled,
@@ -341,7 +321,6 @@ class _MainShellState extends State<MainShell> {
         initialCategory: _requestedHomeCategory,
         favoriteIds: _favoriteIds,
         onFavoriteToggle: _toggleFavorite,
-        onInstitutionsChanged: _rememberInstitutions,
         onOpenInstitution: _openInstitution,
         savedAddress: _savedAddress,
         locationSearchEnabled: _locationSearchEnabled,

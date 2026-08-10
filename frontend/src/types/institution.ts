@@ -98,6 +98,7 @@ export interface NearbyInstitutionSearchParams extends Coordinates {
   hospitalDepartment?: Exclude<HospitalDepartmentId, 'ALL'>;
   operatingSchedule?: OperatingScheduleFilter;
   openNowOnly?: boolean;
+  favoritesOnly?: boolean;
   page?: number;
   size?: number;
 }

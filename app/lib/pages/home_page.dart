@@ -20,7 +20,6 @@ class HomePage extends StatefulWidget {
     required this.user,
     required this.favoriteIds,
     required this.onFavoriteToggle,
-    required this.onInstitutionsChanged,
     required this.onOpenInstitution,
     required this.savedAddress,
     required this.locationSearchEnabled,
@@ -31,7 +30,6 @@ class HomePage extends StatefulWidget {
   final AuthUser? user;
   final Set<int> favoriteIds;
   final Future<void> Function(Institution) onFavoriteToggle;
-  final ValueChanged<List<Institution>> onInstitutionsChanged;
   final ValueChanged<Institution> onOpenInstitution;
   final String savedAddress;
   final bool locationSearchEnabled;
@@ -68,11 +66,7 @@ class _HomePageState extends State<HomePage> {
   List<Institution> _institutions = const [];
 
   List<Institution> get _visibleInstitutions {
-    final results = _institutions.where((institution) {
-      final matchesFavorite =
-          !_favoritesOnly || widget.favoriteIds.contains(institution.id);
-      return matchesFavorite;
-    }).toList();
+    final results = List<Institution>.of(_institutions);
 
     results.sort(
       (left, right) => left.distanceMeters.compareTo(right.distanceMeters),
@@ -280,6 +274,7 @@ class _HomePageState extends State<HomePage> {
         hospitalDepartment: _selectedDepartment,
         operatingSchedule: _operatingSchedule,
         openNowOnly: _openNowOnly,
+        favoritesOnly: _favoritesOnly,
         page: requestedPage,
       );
       if (!mounted || requestSequence != _requestSequence) return;
@@ -303,8 +298,6 @@ class _HomePageState extends State<HomePage> {
         _emergencyRoomCount = result.emergencyRoomCount;
         _selectedInstitutionId = null;
       });
-      widget.onInstitutionsChanged(institutions);
-
       final emergencyInstitutionIds = institutions
           .where((institution) => institution.kind == InstitutionKind.emergency)
           .map((institution) => institution.id)
@@ -360,7 +353,6 @@ class _HomePageState extends State<HomePage> {
         )
         .toList(growable: false);
     setState(() => _institutions = updatedInstitutions);
-    widget.onInstitutionsChanged(updatedInstitutions);
   }
 
   void _setCategory(String category) {
@@ -420,6 +412,14 @@ class _HomePageState extends State<HomePage> {
       _favoritesOnly = selected;
       _selectedInstitutionId = null;
     });
+    unawaited(_loadInstitutions(page: 0));
+  }
+
+  Future<void> _toggleFavorite(Institution institution) async {
+    await widget.onFavoriteToggle(institution);
+    if (mounted && _favoritesOnly) {
+      await _loadInstitutions(page: 0);
+    }
   }
 
   Future<void> _selectDepartment() async {
@@ -738,7 +738,7 @@ class _HomePageState extends State<HomePage> {
             loading: _loading,
             favoriteIds: widget.favoriteIds,
             canFavorite: widget.user != null,
-            onFavoriteToggle: widget.onFavoriteToggle,
+            onFavoriteToggle: _toggleFavorite,
             onOpenInstitution: widget.onOpenInstitution,
             onPreviousPage: () => _goToPage(_currentPage - 1),
             onNextPage: () => _goToPage(_currentPage + 1),

@@ -72,6 +72,16 @@ public interface MedicalInstitutionRepository extends JpaRepository<MedicalInsti
              AND oh.day_of_week = :dayOfWeek
             WHERE mi.active = TRUE
               AND (
+                    :favoriteUsername IS NULL
+                    OR EXISTS (
+                        SELECT 1
+                        FROM user_favorites favorite
+                        JOIN app_users favorite_user ON favorite_user.id = favorite.user_id
+                        WHERE favorite.institution_id = mi.id
+                          AND favorite_user.username = :favoriteUsername
+                    )
+                  )
+              AND (
                     :keyword IS NULL
                     OR LOCATE(:keyword, mi.name) > 0
                     OR LOCATE(:keyword, COALESCE(mi.road_address, '')) > 0
@@ -141,6 +151,16 @@ public interface MedicalInstitutionRepository extends JpaRepository<MedicalInsti
               ON oh.institution_id = mi.id
              AND oh.day_of_week = :dayOfWeek
             WHERE mi.active = TRUE
+              AND (
+                    :favoriteUsername IS NULL
+                    OR EXISTS (
+                        SELECT 1
+                        FROM user_favorites favorite
+                        JOIN app_users favorite_user ON favorite_user.id = favorite.user_id
+                        WHERE favorite.institution_id = mi.id
+                          AND favorite_user.username = :favoriteUsername
+                    )
+                  )
               AND (
                     :keyword IS NULL
                     OR LOCATE(:keyword, mi.name) > 0
@@ -217,6 +237,7 @@ public interface MedicalInstitutionRepository extends JpaRepository<MedicalInsti
             @Param("departmentCode") String departmentCode,
             @Param("operatingSchedule") String operatingSchedule,
             @Param("openNowOnly") boolean openNowOnly,
+            @Param("favoriteUsername") String favoriteUsername,
             Pageable pageable
     );
 

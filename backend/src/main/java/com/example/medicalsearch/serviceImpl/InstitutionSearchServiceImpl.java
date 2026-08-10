@@ -60,6 +60,35 @@ public class InstitutionSearchServiceImpl implements InstitutionSearchService {
             int page,
             int size
     ) {
+        return searchNearby(
+                lat,
+                lng,
+                radiusMeters,
+                keyword,
+                types,
+                hospitalDepartment,
+                operatingSchedule,
+                openNowOnly,
+                page,
+                size,
+                null
+        );
+    }
+
+    @Override
+    public NearbyInstitutionResponse searchNearby(
+            double lat,
+            double lng,
+            Integer radiusMeters,
+            String keyword,
+            List<InstitutionType> types,
+            HospitalDepartment hospitalDepartment,
+            OperatingScheduleFilter operatingSchedule,
+            boolean openNowOnly,
+            int page,
+            int size,
+            String favoriteUsername
+    ) {
         validateCoordinate(lat, lng);
         int normalizedRadiusMeters = normalizeRadius(radiusMeters);
         int normalizedSize = Math.min(size, MAX_PAGE_SIZE);
@@ -85,6 +114,7 @@ public class InstitutionSearchServiceImpl implements InstitutionSearchService {
                 departmentCode,
                 operatingSchedule.name(),
                 openNowOnly,
+                favoriteUsername,
                 PageRequest.of(page, normalizedSize)
         );
 
@@ -103,6 +133,7 @@ public class InstitutionSearchServiceImpl implements InstitutionSearchService {
                 departmentCode,
                 operatingSchedule.name(),
                 openNowOnly,
+                favoriteUsername,
                 nearbyPage.getTotalElements()
         );
 
@@ -159,6 +190,7 @@ public class InstitutionSearchServiceImpl implements InstitutionSearchService {
             String departmentCode,
             String operatingSchedule,
             boolean openNowOnly,
+            String favoriteUsername,
             long totalElements
     ) {
         EnumMap<InstitutionType, Long> counts = new EnumMap<>(InstitutionType.class);
@@ -177,7 +209,8 @@ public class InstitutionSearchServiceImpl implements InstitutionSearchService {
                         currentTime,
                         departmentCode,
                         operatingSchedule,
-                        openNowOnly
+                        openNowOnly,
+                        favoriteUsername
                 )
                 : 0L;
         long emergencyRoomCount = types.contains(InstitutionType.EMERGENCY_ROOM)
@@ -191,7 +224,8 @@ public class InstitutionSearchServiceImpl implements InstitutionSearchService {
                         currentTime,
                         departmentCode,
                         operatingSchedule,
-                        openNowOnly
+                        openNowOnly,
+                        favoriteUsername
                 )
                 : 0L;
         // The main query exposes emergency-capable hospitals as EMERGENCY_ROOM,
@@ -216,7 +250,8 @@ public class InstitutionSearchServiceImpl implements InstitutionSearchService {
             LocalTime currentTime,
             String departmentCode,
             String operatingSchedule,
-            boolean openNowOnly
+            boolean openNowOnly,
+            String favoriteUsername
     ) {
         return medicalInstitutionRepository.findNearby(
                 lat,
@@ -231,6 +266,7 @@ public class InstitutionSearchServiceImpl implements InstitutionSearchService {
                 departmentCode,
                 operatingSchedule,
                 openNowOnly,
+                favoriteUsername,
                 PageRequest.of(0, 1)
         ).getTotalElements();
     }

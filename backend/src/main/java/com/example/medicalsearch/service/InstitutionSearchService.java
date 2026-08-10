@@ -22,5 +22,19 @@ public interface InstitutionSearchService {
             int size
     );
 
+    NearbyInstitutionResponse searchNearby(
+            double lat,
+            double lng,
+            Integer radiusMeters,
+            String keyword,
+            List<InstitutionType> types,
+            HospitalDepartment hospitalDepartment,
+            OperatingScheduleFilter operatingSchedule,
+            boolean openNowOnly,
+            int page,
+            int size,
+            String favoriteUsername
+    );
+
     EmergencyBedAvailabilityResponse getEmergencyBedAvailability(List<Long> institutionIds);
 }

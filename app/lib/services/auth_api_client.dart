@@ -106,6 +106,7 @@ class AuthApiClient {
     required String hospitalDepartment,
     required String operatingSchedule,
     required bool openNowOnly,
+    required bool favoritesOnly,
     required int page,
   }) async {
     final response = await _get(
@@ -120,6 +121,7 @@ class AuthApiClient {
           'hospitalDepartment': hospitalDepartment,
         'operatingSchedule': operatingSchedule,
         'openNowOnly': openNowOnly.toString(),
+        'favoritesOnly': favoritesOnly.toString(),
         'page': page.toString(),
         'size': '30',
       },

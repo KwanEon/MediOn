@@ -2,9 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../constants/institution_icons.dart';
 import '../data/auth_models.dart';
-import '../data/institution_models.dart';
 import '../services/auth_api_client.dart';
 import '../theme/app_colors.dart';
 import '../widgets/common_widgets.dart';
@@ -18,8 +16,6 @@ class MyPage extends StatefulWidget {
     required this.user,
     required this.authApi,
     required this.onUserChanged,
-    required this.favoriteInstitutions,
-    required this.onFavoriteToggle,
     required this.healthNoticeEnabled,
     required this.onHealthNoticeChanged,
     required this.locationSearchEnabled,
@@ -29,8 +25,6 @@ class MyPage extends StatefulWidget {
   final AuthUser user;
   final AuthApiClient authApi;
   final ValueChanged<AuthUser> onUserChanged;
-  final List<Institution> favoriteInstitutions;
-  final Future<void> Function(Institution) onFavoriteToggle;
   final bool healthNoticeEnabled;
   final Future<bool> Function(bool) onHealthNoticeChanged;
   final bool locationSearchEnabled;
@@ -41,7 +35,6 @@ class MyPage extends StatefulWidget {
 }
 
 class _MyPageState extends State<MyPage> {
-  late final List<Institution> _favoriteInstitutions;
   late AuthUser _currentUser;
   late bool _healthNoticeEnabled;
   late bool _locationSearchEnabled;
@@ -51,19 +44,9 @@ class _MyPageState extends State<MyPage> {
   @override
   void initState() {
     super.initState();
-    _favoriteInstitutions = List<Institution>.of(widget.favoriteInstitutions);
     _currentUser = widget.user;
     _healthNoticeEnabled = widget.healthNoticeEnabled;
     _locationSearchEnabled = widget.locationSearchEnabled;
-  }
-
-  Future<void> _removeFavorite(Institution institution) async {
-    setState(() {
-      _favoriteInstitutions.removeWhere(
-        (favorite) => favorite.id == institution.id,
-      );
-    });
-    await widget.onFavoriteToggle(institution);
   }
 
   Future<void> _openMemberInfo() async {
@@ -174,29 +157,6 @@ class _MyPageState extends State<MyPage> {
             children: [
               _ProfileCard(user: _currentUser),
               const SizedBox(height: 28),
-              SectionHeading(
-                title: '즐겨찾기',
-                trailing: Text(
-                  '${_favoriteInstitutions.length}곳',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.labelLarge?.copyWith(color: AppColors.primary),
-                ),
-              ),
-              const SizedBox(height: 12),
-              if (_favoriteInstitutions.isEmpty)
-                const _EmptyFavorites()
-              else
-                ..._favoriteInstitutions.map(
-                  (institution) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _FavoriteInstitutionCard(
-                      institution: institution,
-                      onRemove: () => unawaited(_removeFavorite(institution)),
-                    ),
-                  ),
-                ),
-              const SizedBox(height: 18),
               const SectionHeading(title: '앱 설정'),
               const SizedBox(height: 12),
               SurfaceCard(
@@ -328,136 +288,6 @@ class _ProfileCard extends StatelessWidget {
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EmptyFavorites extends StatelessWidget {
-  const _EmptyFavorites();
-
-  @override
-  Widget build(BuildContext context) {
-    return SurfaceCard(
-      child: Column(
-        children: [
-          const IconTile(
-            icon: Icons.star_outline_rounded,
-            color: AppColors.amber,
-            backgroundColor: AppColors.amberSoft,
-            size: 56,
-            iconSize: 28,
-          ),
-          const SizedBox(height: 12),
-          Text('즐겨찾기한 기관이 없어요', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 5),
-          Text(
-            '자주 방문하는 병원과 약국을 저장해 보세요.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FavoriteInstitutionCard extends StatelessWidget {
-  const _FavoriteInstitutionCard({
-    required this.institution,
-    required this.onRemove,
-  });
-
-  final Institution institution;
-  final VoidCallback onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    final isPharmacy = institution.kind == InstitutionKind.pharmacy;
-    final isEmergency = institution.kind == InstitutionKind.emergency;
-    final color = isEmergency
-        ? AppColors.red
-        : isPharmacy
-        ? AppColors.green
-        : AppColors.primary;
-    final softColor = isEmergency
-        ? AppColors.redSoft
-        : isPharmacy
-        ? AppColors.greenSoft
-        : AppColors.primarySoft;
-    final icon = institutionIconFor(institution.kind);
-
-    return SurfaceCard(
-      padding: const EdgeInsets.all(15),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          IconTile(
-            icon: icon,
-            color: color,
-            backgroundColor: softColor,
-            size: 50,
-            iconSize: 25,
-          ),
-          const SizedBox(width: 13),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  institution.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 5),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TinyTag(
-                    label: institution.typeLabel,
-                    color: color,
-                    backgroundColor: softColor,
-                  ),
-                ),
-                const SizedBox(height: 7),
-                Row(
-                  children: [
-                    TinyTag(
-                      label: institution.isOpen ? '진료 중' : '진료 종료',
-                      color: institution.isOpen
-                          ? AppColors.green
-                          : AppColors.muted,
-                      backgroundColor: institution.isOpen
-                          ? AppColors.greenSoft
-                          : const Color(0xFFF0F2F5),
-                    ),
-                    const SizedBox(width: 7),
-                    Text(
-                      institution.distanceSummary,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  institution.address,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            tooltip: '즐겨찾기 해제',
-            onPressed: onRemove,
-            icon: const Icon(
-              Icons.star_rounded,
-              color: AppColors.amber,
-              size: 25,
             ),
           ),
         ],
