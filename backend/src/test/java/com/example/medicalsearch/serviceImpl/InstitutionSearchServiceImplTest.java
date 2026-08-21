@@ -80,6 +80,7 @@ class InstitutionSearchServiceImplTest {
                 eq("D001"),
                 eq("NIGHT"),
                 eq(true),
+                eq(false),
                 isNull(),
                 eq(PageRequest.of(0, 20))
         )).thenReturn(new PageImpl<>(List.of(row), PageRequest.of(0, 20), 1));
@@ -116,6 +117,7 @@ class InstitutionSearchServiceImplTest {
                 eq("D001"),
                 eq("NIGHT"),
                 eq(true),
+                eq(false),
                 isNull(),
                 eq(PageRequest.of(0, 20))
         );

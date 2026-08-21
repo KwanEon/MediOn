@@ -66,7 +66,9 @@ class _HomePageState extends State<HomePage> {
   List<Institution> _institutions = const [];
 
   List<Institution> get _visibleInstitutions {
-    final results = List<Institution>.of(_institutions);
+    final results = _institutions.where((institution) {
+      return !_favoritesOnly || widget.favoriteIds.contains(institution.id);
+    }).toList();
 
     results.sort(
       (left, right) => left.distanceMeters.compareTo(right.distanceMeters),

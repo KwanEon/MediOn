@@ -72,7 +72,7 @@ public interface MedicalInstitutionRepository extends JpaRepository<MedicalInsti
              AND oh.day_of_week = :dayOfWeek
             WHERE mi.active = TRUE
               AND (
-                    :favoriteUsername IS NULL
+                    :favoritesOnly = FALSE
                     OR EXISTS (
                         SELECT 1
                         FROM user_favorites favorite
@@ -152,7 +152,7 @@ public interface MedicalInstitutionRepository extends JpaRepository<MedicalInsti
              AND oh.day_of_week = :dayOfWeek
             WHERE mi.active = TRUE
               AND (
-                    :favoriteUsername IS NULL
+                    :favoritesOnly = FALSE
                     OR EXISTS (
                         SELECT 1
                         FROM user_favorites favorite
@@ -237,6 +237,7 @@ public interface MedicalInstitutionRepository extends JpaRepository<MedicalInsti
             @Param("departmentCode") String departmentCode,
             @Param("operatingSchedule") String operatingSchedule,
             @Param("openNowOnly") boolean openNowOnly,
+            @Param("favoritesOnly") boolean favoritesOnly,
             @Param("favoriteUsername") String favoriteUsername,
             Pageable pageable
     );
