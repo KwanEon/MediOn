@@ -2,6 +2,7 @@ package com.example.medicalsearch.service;
 
 import com.example.medicalsearch.client.NaverMapsGeocodingClient;
 import com.example.medicalsearch.client.NaverMapsGeocodingClient.GeocodedAddress;
+import com.example.medicalsearch.client.OpenStreetMapStationSearchClient;
 import com.example.medicalsearch.dto.AuthUserResponse;
 import com.example.medicalsearch.dto.AddressSearchItemResponse;
 import com.example.medicalsearch.dto.RegisterRequest;
@@ -10,8 +11,11 @@ import com.example.medicalsearch.dto.UpdateProfileRequest;
 import com.example.medicalsearch.entity.AppUser;
 import com.example.medicalsearch.repository.AppUserRepository;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -26,15 +30,18 @@ public class AuthService implements UserDetailsService {
     private final AppUserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final NaverMapsGeocodingClient geocodingClient;
+    private final OpenStreetMapStationSearchClient stationSearchClient;
 
     public AuthService(
             AppUserRepository userRepository,
             PasswordEncoder passwordEncoder,
-            NaverMapsGeocodingClient geocodingClient
+            NaverMapsGeocodingClient geocodingClient,
+            OpenStreetMapStationSearchClient stationSearchClient
     ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.geocodingClient = geocodingClient;
+        this.stationSearchClient = stationSearchClient;
     }
 
     @Transactional
@@ -102,13 +109,40 @@ public class AuthService implements UserDetailsService {
         return AuthUserResponse.from(user);
     }
 
-    public List<AddressSearchItemResponse> searchAddresses(String query) {
+    public List<AddressSearchItemResponse> searchAddresses(String query, boolean includeStations) {
         if (query == null || query.trim().length() < 2) {
-            throw new IllegalArgumentException("주소를 두 글자 이상 입력해 주세요.");
+            throw new IllegalArgumentException(includeStations
+                    ? "주소나 역 이름을 두 글자 이상 입력해 주세요."
+                    : "주소를 두 글자 이상 입력해 주세요.");
         }
-        return geocodingClient.search(query.trim(), 10).stream()
+
+        String normalizedQuery = query.trim();
+        List<AddressSearchItemResponse> results = new ArrayList<>();
+        if (includeStations && normalizedQuery.endsWith("역")) {
+            results.addAll(stationSearchClient.search(normalizedQuery, 10).stream()
+                    .map(AddressSearchItemResponse::from)
+                    .toList());
+            if (!results.isEmpty()) {
+                return uniqueResults(results);
+            }
+        }
+        results.addAll(geocodingClient.search(normalizedQuery, 10).stream()
                 .map(AddressSearchItemResponse::from)
-                .toList();
+                .toList());
+        return uniqueResults(results);
+    }
+
+    private List<AddressSearchItemResponse> uniqueResults(List<AddressSearchItemResponse> results) {
+        Map<String, AddressSearchItemResponse> uniqueResults = new LinkedHashMap<>();
+        for (AddressSearchItemResponse result : results) {
+            String coordinateKey = result.latitude().stripTrailingZeros().toPlainString()
+                    + ":" + result.longitude().stripTrailingZeros().toPlainString();
+            uniqueResults.putIfAbsent(coordinateKey, result);
+            if (uniqueResults.size() == 10) {
+                break;
+            }
+        }
+        return List.copyOf(uniqueResults.values());
     }
 
     @Override

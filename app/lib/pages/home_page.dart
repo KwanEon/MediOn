@@ -235,6 +235,7 @@ class _HomePageState extends State<HomePage> {
             builder: (_) => AddressSearchPage(
               authApi: widget.authApi,
               initialQuery: widget.user?.address ?? widget.savedAddress,
+              includeStations: true,
             ),
           ),
         );

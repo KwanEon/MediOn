@@ -41,8 +41,14 @@ export async function logout(): Promise<void> {
   }
 }
 
-export async function searchAddresses(query: string): Promise<AddressSearchResult[]> {
-  const params = new URLSearchParams({ query });
+export async function searchAddresses(
+  query: string,
+  includeStations = false
+): Promise<AddressSearchResult[]> {
+  const params = new URLSearchParams({
+    query,
+    includeStations: String(includeStations)
+  });
   const response = await fetch(`/api/v1/auth/addresses?${params.toString()}`, {
     credentials: 'include'
   });

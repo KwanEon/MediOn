@@ -30,6 +30,7 @@ export interface UpdateProfileRequest {
 
 export interface AddressSearchResult {
   address: string;
+  kind: 'ADDRESS' | 'STATION';
   roadAddress: string | null;
   jibunAddress: string | null;
   latitude: number;

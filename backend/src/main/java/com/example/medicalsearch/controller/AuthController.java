@@ -95,8 +95,11 @@ public class AuthController {
     }
 
     @GetMapping("/addresses")
-    List<AddressSearchItemResponse> searchAddresses(@RequestParam String query) {
-        return authService.searchAddresses(query);
+    List<AddressSearchItemResponse> searchAddresses(
+            @RequestParam String query,
+            @RequestParam(defaultValue = "false") boolean includeStations
+    ) {
+        return authService.searchAddresses(query, includeStations);
     }
 
     @PostMapping("/logout")

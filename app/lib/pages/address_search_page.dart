@@ -10,10 +10,12 @@ class AddressSearchPage extends StatefulWidget {
     super.key,
     required this.authApi,
     this.initialQuery = '',
+    this.includeStations = false,
   });
 
   final AuthApiClient authApi;
   final String initialQuery;
+  final bool includeStations;
 
   @override
   State<AddressSearchPage> createState() => _AddressSearchPageState();
@@ -42,7 +44,9 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
     final query = _controller.text.trim();
     if (query.length < 2) {
       setState(() {
-        _error = '도로명이나 지번 주소를 두 글자 이상 입력해 주세요.';
+        _error = widget.includeStations
+            ? '도로명, 지번 주소 또는 역 이름을 두 글자 이상 입력해 주세요.'
+            : '도로명이나 지번 주소를 두 글자 이상 입력해 주세요.';
         _results = const [];
       });
       return;
@@ -54,12 +58,17 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
       _results = const [];
     });
     try {
-      final results = await widget.authApi.searchAddresses(query);
+      final results = await widget.authApi.searchAddresses(
+        query,
+        includeStations: widget.includeStations,
+      );
       if (!mounted) return;
       setState(() {
         _results = results;
         if (results.isEmpty) {
-          _error = '검색 결과가 없습니다. 도로명과 건물번호를 확인해 주세요.';
+          _error = widget.includeStations
+              ? '검색 결과가 없습니다. 주소나 역 이름을 확인해 주세요.'
+              : '검색 결과가 없습니다. 도로명과 건물번호를 확인해 주세요.';
         }
       });
     } on AuthApiException catch (error) {
@@ -78,7 +87,7 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('주소 검색'),
+        title: Text(widget.includeStations ? '주소·역 검색' : '주소 검색'),
         centerTitle: true,
         shape: const Border(bottom: BorderSide(color: AppColors.line)),
       ),
@@ -86,13 +95,17 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const PageHeading(
-              title: '주소를 검색하세요',
-              subtitle: '도로명이나 지번 주소로 정확한 위치를 선택할 수 있어요.',
+            PageHeading(
+              title: widget.includeStations ? '주소나 역을 검색하세요' : '주소를 검색하세요',
+              subtitle: widget.includeStations
+                  ? '도로명·지번 주소 또는 역 이름으로 위치를 선택할 수 있어요.'
+                  : '도로명이나 지번 주소로 정확한 위치를 선택할 수 있어요.',
             ),
             const SizedBox(height: 22),
             AppSearchField(
-              hintText: '예: 서울시 중구 세종대로 110',
+              hintText: widget.includeStations
+                  ? '예: 서울시 중구 세종대로 110 또는 강남역'
+                  : '예: 서울시 중구 세종대로 110',
               controller: _controller,
               autofocus: widget.initialQuery.isEmpty,
               onSubmitted: (_) => _search(),
@@ -107,7 +120,11 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
             ),
             const SizedBox(height: 12),
             PrimaryButton(
-              label: _searching ? '검색 중' : '주소 검색',
+              label: _searching
+                  ? '검색 중'
+                  : widget.includeStations
+                  ? '위치 검색'
+                  : '주소 검색',
               loading: _searching,
               onPressed: _search,
             ),
@@ -163,8 +180,10 @@ class _AddressResultCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const IconTile(
-            icon: Icons.location_on_outlined,
+          IconTile(
+            icon: result.isStation
+                ? Icons.train_rounded
+                : Icons.location_on_outlined,
             size: 46,
             iconSize: 23,
           ),
@@ -180,7 +199,9 @@ class _AddressResultCard extends StatelessWidget {
                 if (showJibun) ...[
                   const SizedBox(height: 5),
                   Text(
-                    '지번 ${result.jibunAddress}',
+                    result.isStation
+                        ? result.jibunAddress!
+                        : '지번 ${result.jibunAddress}',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
