@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import com.example.medicalsearch.client.NaverMapsGeocodingClient;
 import com.example.medicalsearch.client.NaverMapsGeocodingClient.GeocodedAddress;
+import com.example.medicalsearch.client.OpenStreetMapStationSearchClient;
 import com.example.medicalsearch.dto.AuthUserResponse;
 import com.example.medicalsearch.dto.UpdateProfileRequest;
 import com.example.medicalsearch.entity.AppUser;
@@ -24,6 +25,7 @@ class AuthServiceTest {
         AppUserRepository userRepository = mock(AppUserRepository.class);
         PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
         NaverMapsGeocodingClient geocodingClient = mock(NaverMapsGeocodingClient.class);
+        OpenStreetMapStationSearchClient stationSearchClient = mock(OpenStreetMapStationSearchClient.class);
         AppUser user = new AppUser(
                 "member",
                 "encoded-password",
@@ -47,7 +49,12 @@ class AuthServiceTest {
                         new BigDecimal("37.5665000"),
                         new BigDecimal("126.9780000")
                 ));
-        AuthService service = new AuthService(userRepository, passwordEncoder, geocodingClient);
+        AuthService service = new AuthService(
+                userRepository,
+                passwordEncoder,
+                geocodingClient,
+                stationSearchClient
+        );
 
         AuthUserResponse response = service.updateProfile(
                 "member",

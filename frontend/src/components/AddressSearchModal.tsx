@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Check, MapPin, RefreshCw, Search, X } from 'lucide-react';
+import { Check, MapPin, RefreshCw, Search, TrainFront, X } from 'lucide-react';
 import { searchAddresses } from '../api/auth';
 import type { AddressSearchResult } from '../types/auth';
 
@@ -55,7 +55,7 @@ function AddressSearchModal({ open, onClose, onSelect }: AddressSearchModalProps
     event?.preventDefault();
     const normalizedQuery = query.trim();
     if (normalizedQuery.length < 2) {
-      setError('도로명이나 지번 주소를 두 글자 이상 입력해 주세요.');
+      setError('도로명, 지번 주소 또는 역 이름을 두 글자 이상 입력해 주세요.');
       setResults([]);
       return;
     }
@@ -64,10 +64,10 @@ function AddressSearchModal({ open, onClose, onSelect }: AddressSearchModalProps
     setError('');
     setSelectedAddress(null);
     try {
-      const addressResults = await searchAddresses(normalizedQuery);
+      const addressResults = await searchAddresses(normalizedQuery, true);
       setResults(addressResults);
       if (addressResults.length === 0) {
-        setError('검색 결과가 없습니다. 도로명과 건물번호를 확인해 주세요.');
+        setError('검색 결과가 없습니다. 주소나 역 이름을 확인해 주세요.');
       }
     } catch (searchError: unknown) {
       setResults([]);
@@ -116,8 +116,8 @@ function AddressSearchModal({ open, onClose, onSelect }: AddressSearchModalProps
         <div className="modal-heading">
           <span><MapPin size={23} /></span>
           <div>
-            <h2 id="address-location-modal-title">주소로 의료기관 찾기</h2>
-            <p>검색 기준으로 사용할 주소를 선택해 주세요.</p>
+            <h2 id="address-location-modal-title">주소 또는 역으로 의료기관 찾기</h2>
+            <p>검색 기준으로 사용할 주소나 역을 선택해 주세요.</p>
           </div>
         </div>
 
@@ -129,37 +129,42 @@ function AddressSearchModal({ open, onClose, onSelect }: AddressSearchModalProps
                 ref={inputRef}
                 value={query}
                 onChange={(event) => changeQuery(event.target.value)}
-                autoComplete="street-address"
+                autoComplete="off"
                 maxLength={255}
-                placeholder="도로명 또는 지번 주소를 입력해 주세요"
+                placeholder="도로명·지번 주소 또는 역 이름을 입력해 주세요"
               />
               {selectedAddress && <Check className="address-selected-icon" size={18} />}
             </div>
             <button className="address-search-button" type="submit" disabled={searching}>
               {searching ? <RefreshCw className="spin" size={17} /> : <Search size={17} />}
-              {searching ? '검색 중' : '주소 검색'}
+              {searching ? '검색 중' : '위치 검색'}
             </button>
           </div>
           {error && <small className="address-search-error" role="alert">{error}</small>}
           {results.length > 0 && (
             <div className="address-search-results" role="listbox" aria-label="주소 검색 결과">
-              {results.map((result) => (
-                <button
-                  key={`${result.latitude}-${result.longitude}-${result.address}`}
-                  type="button"
-                  role="option"
-                  aria-selected={false}
-                  onClick={() => selectResult(result)}
-                >
-                  <MapPin size={17} />
-                  <span>
-                    <strong>{result.roadAddress ?? result.address}</strong>
-                    {result.jibunAddress && result.jibunAddress !== result.roadAddress && (
-                      <small>지번 {result.jibunAddress}</small>
-                    )}
-                  </span>
-                </button>
-              ))}
+              {results.map((result) => {
+                const stationResult = result.kind === 'STATION';
+                return (
+                  <button
+                    key={`${result.latitude}-${result.longitude}-${result.address}`}
+                    type="button"
+                    role="option"
+                    aria-selected={false}
+                    onClick={() => selectResult(result)}
+                  >
+                    {stationResult ? <TrainFront size={17} /> : <MapPin size={17} />}
+                    <span>
+                      <strong>{result.roadAddress ?? result.address}</strong>
+                      {result.jibunAddress && result.jibunAddress !== result.roadAddress && (
+                        <small>
+                          {stationResult ? result.jibunAddress : `지번 ${result.jibunAddress}`}
+                        </small>
+                      )}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           )}
         </form>
@@ -172,7 +177,7 @@ function AddressSearchModal({ open, onClose, onSelect }: AddressSearchModalProps
             disabled={!selectedAddress || searching}
             onClick={() => selectedAddress && onSelect(selectedAddress)}
           >
-            이 주소로 찾기
+            이 위치로 찾기
           </button>
         </div>
       </section>

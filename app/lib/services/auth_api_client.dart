@@ -55,10 +55,16 @@ class AuthApiClient {
     return AuthUser.fromJson(_decodeObject(response));
   }
 
-  Future<List<AddressSearchResult>> searchAddresses(String query) async {
+  Future<List<AddressSearchResult>> searchAddresses(
+    String query, {
+    bool includeStations = false,
+  }) async {
     final response = await _get(
       '/api/v1/auth/addresses',
-      queryParameters: {'query': query.trim()},
+      queryParameters: {
+        'query': query.trim(),
+        'includeStations': includeStations.toString(),
+      },
     );
     final decoded = _decode(response);
     if (decoded is! List<dynamic>) {

@@ -36,6 +36,7 @@ class AuthUser {
 class AddressSearchResult {
   const AddressSearchResult({
     required this.address,
+    required this.kind,
     required this.roadAddress,
     required this.jibunAddress,
     required this.latitude,
@@ -45,6 +46,7 @@ class AddressSearchResult {
   factory AddressSearchResult.fromJson(Map<String, dynamic> json) {
     return AddressSearchResult(
       address: json['address'] as String,
+      kind: json['kind'] as String? ?? 'ADDRESS',
       roadAddress: json['roadAddress'] as String?,
       jibunAddress: json['jibunAddress'] as String?,
       latitude: (json['latitude'] as num).toDouble(),
@@ -53,12 +55,14 @@ class AddressSearchResult {
   }
 
   final String address;
+  final String kind;
   final String? roadAddress;
   final String? jibunAddress;
   final double latitude;
   final double longitude;
 
   String get displayAddress => roadAddress ?? address;
+  bool get isStation => kind == 'STATION';
 }
 
 class RegistrationResult {
