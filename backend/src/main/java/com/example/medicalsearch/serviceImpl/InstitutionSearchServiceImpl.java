@@ -71,6 +71,7 @@ public class InstitutionSearchServiceImpl implements InstitutionSearchService {
                 openNowOnly,
                 page,
                 size,
+                false,
                 null
         );
     }
@@ -87,6 +88,7 @@ public class InstitutionSearchServiceImpl implements InstitutionSearchService {
             boolean openNowOnly,
             int page,
             int size,
+            boolean favoritesOnly,
             String favoriteUsername
     ) {
         validateCoordinate(lat, lng);
@@ -114,6 +116,7 @@ public class InstitutionSearchServiceImpl implements InstitutionSearchService {
                 departmentCode,
                 operatingSchedule.name(),
                 openNowOnly,
+                favoritesOnly,
                 favoriteUsername,
                 PageRequest.of(page, normalizedSize)
         );
@@ -133,6 +136,7 @@ public class InstitutionSearchServiceImpl implements InstitutionSearchService {
                 departmentCode,
                 operatingSchedule.name(),
                 openNowOnly,
+                favoritesOnly,
                 favoriteUsername,
                 nearbyPage.getTotalElements()
         );
@@ -190,6 +194,7 @@ public class InstitutionSearchServiceImpl implements InstitutionSearchService {
             String departmentCode,
             String operatingSchedule,
             boolean openNowOnly,
+            boolean favoritesOnly,
             String favoriteUsername,
             long totalElements
     ) {
@@ -210,6 +215,7 @@ public class InstitutionSearchServiceImpl implements InstitutionSearchService {
                         departmentCode,
                         operatingSchedule,
                         openNowOnly,
+                        favoritesOnly,
                         favoriteUsername
                 )
                 : 0L;
@@ -225,6 +231,7 @@ public class InstitutionSearchServiceImpl implements InstitutionSearchService {
                         departmentCode,
                         operatingSchedule,
                         openNowOnly,
+                        favoritesOnly,
                         favoriteUsername
                 )
                 : 0L;
@@ -251,6 +258,7 @@ public class InstitutionSearchServiceImpl implements InstitutionSearchService {
             String departmentCode,
             String operatingSchedule,
             boolean openNowOnly,
+            boolean favoritesOnly,
             String favoriteUsername
     ) {
         return medicalInstitutionRepository.findNearby(
@@ -266,6 +274,7 @@ public class InstitutionSearchServiceImpl implements InstitutionSearchService {
                 departmentCode,
                 operatingSchedule,
                 openNowOnly,
+                favoritesOnly,
                 favoriteUsername,
                 PageRequest.of(0, 1)
         ).getTotalElements();

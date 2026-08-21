@@ -65,6 +65,7 @@ public class InstitutionSearchController {
                 openNowOnly,
                 page,
                 size,
+                favoritesOnly,
                 favoritesOnly ? authentication.getName() : null
         );
     }

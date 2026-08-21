@@ -33,6 +33,7 @@ public interface InstitutionSearchService {
             boolean openNowOnly,
             int page,
             int size,
+            boolean favoritesOnly,
             String favoriteUsername
     );
 
